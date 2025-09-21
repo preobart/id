@@ -293,3 +293,24 @@ CELERY_WORKER_SEND_TASK_EVENTS = env("CELERY_WORKER_SEND_TASK_EVENTS", "true")
 
 CELERY_EVENT_QUEUE_EXPIRES = float(env("CELERY_EVENT_QUEUE_EXPIRES", 60.0))
 CELERY_EVENT_QUEUE_TTL = float(env("CELERY_EVENT_QUEUE_TTL", 5.0))
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "%(levelname)-8s [%(asctime)s] %(name)s: %(message)s"
+        },
+    },
+    "handlers": {
+        "console": {
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "DEBUG",
+    },
+}
