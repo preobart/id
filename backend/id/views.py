@@ -23,6 +23,7 @@ User = get_user_model()
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@ensure_csrf_cookie
 def register_view(request):
     serializer = UserRegistrationSerializer(data=request.data)
     if serializer.is_valid():
@@ -35,6 +36,7 @@ def register_view(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@ensure_csrf_cookie
 def login_view(request):
     username = request.data.get("username")
     password = request.data.get("password")

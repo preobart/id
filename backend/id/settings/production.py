@@ -1,3 +1,5 @@
+import re
+
 from .base import *
 
 
@@ -6,7 +8,9 @@ DEBUG = True
 SECRET_KEY = env("SECRET_KEY")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS").split(",")
 
-CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS", "").split(",")
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    re.compile(r) for r in env("CORS_ALLOWED_ORIGIN_REGEXES", "").split(",") if r
+]
 CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS", "").split(",")
 
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
