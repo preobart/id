@@ -3,7 +3,7 @@ import re
 from .base import *
 
 
-DEBUG = True
+DEBUG = False
 
 SECRET_KEY = env("SECRET_KEY")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS").split(",")
