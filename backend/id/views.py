@@ -12,16 +12,16 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-
-logger = logging.getLogger(__name__)
-
-
 from .serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetSerializer,
     UserRegistrationSerializer,
     UserSerializer,
 )
+
+
+logger = logging.getLogger(__name__)
+
 
 
 User = get_user_model()

@@ -23,7 +23,7 @@ jobs:
 
       - name: Build and push image
         run: |
-          docker build -f backend/Dockerfile -t cr.yandex/$YC_CONTAINER_REGISTRY/id:$IMAGE_TAG .
+          docker build -t cr.yandex/$YC_CONTAINER_REGISTRY/id:$IMAGE_TAG .
           docker push cr.yandex/$YC_CONTAINER_REGISTRY/id:$IMAGE_TAG
 
       - name: Deploy COI VM
