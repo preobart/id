@@ -1,0 +1,84 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: {{ env.POSTGRES_USER }}
+      POSTGRES_PASSWORD: {{ env.POSTGRES_PASSWORD }}
+      POSTGRES_DB: {{ env.POSTGRES_DB }}
+    ports:
+      - "5432:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  broker:
+    image: "rabbitmq:alpine"
+    restart: always
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  result:
+    image: "redis:alpine"
+    restart: always
+    networks:
+      - backend
+
+  app:
+    image: {{ env.IMAGE }}
+    restart: always
+    command: >
+      sh -c "
+        python manage.py makemigrations --dry-run --check &&
+        python manage.py migrate --no-input &&
+        gunicorn clipboard.wsgi:application \
+          --bind 0.0.0.0:8081 \
+          --access-logfile - \
+          --error-logfile - \
+          --capture-output \
+          --log-level info \
+          --workers 2 \
+          --timeout 120 \
+          --reload
+      "
+    container_name: app
+    ports:
+      - "8081:8081"
+    depends_on:
+      db:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+      result:
+        condition: service_started
+    environment:
+      DJANGO_SETTINGS_MODULE: {{ env.DJANGO_SETTINGS_MODULE }}
+      SECRET_KEY: {{ env.SECRET_KEY }}
+      ALLOWED_HOSTS: {{ env.ALLOWED_HOSTS }}
+      POSTGRES_USER: {{ env.POSTGRES_USER }}
+      POSTGRES_PASSWORD: {{ env.POSTGRES_PASSWORD }}
+      POSTGRES_DB: {{ env.POSTGRES_DB }}
+      CELERY_BROKER_URL: "amqp://broker:5672//"
+      REDIS_URL: "redis://result:6379/0"
+      PORT: 8081
+    networks:
+      - backend
+
+volumes:
+  dbdata:
+    name: brvjeo_dbdata
+
+networks:
+  backend:
+    driver: bridge

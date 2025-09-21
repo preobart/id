@@ -1,0 +1,54 @@
+name: Build and deploy backend
+
+on:
+  workflow_dispatch:
+
+env:
+  YC_CONTAINER_REGISTRY: crpkqhak0m8h69pg58ro
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Yandex Cloud Container Registry
+        id: login-cr
+        uses: yc-actions/yc-cr-login@v1
+        with:
+          yc-sa-json-credentials: ${{ secrets.YC_SA_CREDENTIALS }}
+
+      - name: Build and push image
+        run: |
+          docker build -f backend/Dockerfile -t cr.yandex/$YC_CONTAINER_REGISTRY/clipboard:$IMAGE_TAG .
+          docker push cr.yandex/$YC_CONTAINER_REGISTRY/clipboard:$IMAGE_TAG
+
+      - name: Deploy COI VM
+        id: deploy-coi
+        uses: yc-actions/yc-coi-deploy@v2
+        env:
+          YC_SSH_LOGIN: ${{ secrets.YC_SSH_LOGIN }}
+          YC_SSH_PUBLIC_KEY: ${{ secrets.YC_SSH_PUBLIC_KEY }}
+          IMAGE: cr.yandex/crpkqhak0m8h69pg58ro/clipboard:${{ github.sha }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ALLOWED_HOSTS: clipboard.brvjeo.ru,localhost
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: clipboard
+          DJANGO_SETTINGS_MODULE: clipboard.settings.production
+        with:
+          yc-sa-json-credentials: ${{ secrets.YC_SA_CREDENTIALS }}
+          folder-id: b1gik8v14ivmclu6s0vs
+          vm-name: clipboard
+          vm-service-account-id: aje6ibnmefju674ofgld
+          vm-cores: 2
+          vm-memory: 2GB
+          vm-disk-size: 15GB
+          vm-core-fraction: 50
+          vm-zone-id: ru-central1-d
+          vm-subnet-id: fl8rnq3om5ptcbsq4dsr
+          user-data-path: "./user-data.yaml"
+          docker-compose-path: "./docker-compose.yml"
