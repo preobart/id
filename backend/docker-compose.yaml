@@ -11,29 +11,29 @@
     volumes:
       - dbdata:/var/lib/postgresql/data
     networks:
-      - brvjeoID
+      - id
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  broker:
-    image: "rabbitmq:alpine"
-    restart: always
-    networks:
-      - brvjeoID
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
-      interval: 5s
-      timeout: 10s
-      retries: 5
+  # broker:
+  #   image: "rabbitmq:alpine"
+  #   restart: always
+  #   networks:
+  #     - id
+  #   healthcheck:
+  #     test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+  #     interval: 5s
+  #     timeout: 10s
+  #     retries: 5
 
   result:
     image: "redis:alpine"
     restart: always
     networks:
-      - brvjeoID
+      - id
 
   app:
     build:
@@ -41,20 +41,26 @@
       context: .
     restart: always
     command: >
-      sh -c "python manage.py makemigrations --dry-run --check &&
-            python manage.py migrate --no-input &&
-            python manage.py runserver_plus --cert-file cert.pem 0.0.0.0:8081
-            # python manage.py collectstatic --noinput &&
-            # gunicorn brvjeoID.wsgi:application --bind 0.0.0.0:8081
-            # --access-logfile - --error-logfile - --capture-output
-            # --log-level info --workers 2 --timeout 120 --reload"
+      sh -c "
+        python manage.py makemigrations --dry-run --check &&
+        python manage.py migrate --no-input &&
+        gunicorn id.wsgi:application \
+          --bind 0.0.0.0:8081 \
+          --access-logfile - \
+          --error-logfile - \
+          --capture-output \
+          --log-level info \
+          --workers 2 \
+          --timeout 120 \
+          --reload
+      "
     ports:
       - "8081:8081"
     depends_on:
       db:
         condition: service_healthy
-      broker:
-        condition: service_healthy
+      # broker:
+      #   condition: service_healthy
       result:
         condition: service_started
     environment:
@@ -69,64 +75,64 @@
       REDIS_URL: ${REDIS_URL}
       PORT: 8081
     networks:
-      - brvjeoID
+      - id
 
-  celery:
-    build:
-      dockerfile: Dockerfile
-      context: .
-    restart: always
-    command: celery --app=brvjeoID.celery_app worker --loglevel=info
-    depends_on:
-      db:
-        condition: service_started
-      broker:
-        condition: service_healthy
-      result:
-        condition: service_started
-    environment:
-      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE}
-      SECRET_KEY: ${SECRET_KEY}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
-      REDIS_URL: ${REDIS_URL}
-    networks:
-      - brvjeoID
+  # celery:
+  #   build:
+  #     dockerfile: Dockerfile
+  #     context: .
+  #   restart: always
+  #   command: celery --app=id.celery_app worker --loglevel=info
+  #   depends_on:
+  #     db:
+  #       condition: service_started
+  #     broker:
+  #       condition: service_healthy
+  #     result:
+  #       condition: service_started
+  #   environment:
+  #     DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE}
+  #     SECRET_KEY: ${SECRET_KEY}
+  #     ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+  #     POSTGRES_USER: ${POSTGRES_USER}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #     POSTGRES_DB: ${POSTGRES_DB}
+  #     CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+  #     REDIS_URL: ${REDIS_URL}
+  #   networks:
+  #     - id
 
-  celery_beat:
-    build:
-      dockerfile: Dockerfile
-      context: .
-    restart: always
-    command: celery --app=brvjeoID.celery_app beat --scheduler django_celery_beat.schedulers:DatabaseScheduler --loglevel=info
-    depends_on:
-      db:
-        condition: service_healthy
-      broker:
-        condition: service_healthy
-      result:
-        condition: service_started
-      app:
-        condition: service_started
-    environment:
-      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE}
-      SECRET_KEY: ${SECRET_KEY}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
-      REDIS_URL: ${REDIS_URL}
-    networks:
-      - brvjeoID
+  # celery_beat:
+  #   build:
+  #     dockerfile: Dockerfile
+  #     context: .
+  #   restart: always
+  #   command: celery --app=id.celery_app beat --scheduler django_celery_beat.schedulers:DatabaseScheduler --loglevel=info
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #     broker:
+  #       condition: service_healthy
+  #     result:
+  #       condition: service_started
+  #     app:
+  #       condition: service_started
+  #   environment:
+  #     DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE}
+  #     SECRET_KEY: ${SECRET_KEY}
+  #     ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+  #     POSTGRES_USER: ${POSTGRES_USER}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #     POSTGRES_DB: ${POSTGRES_DB}
+  #     CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+  #     REDIS_URL: ${REDIS_URL}
+  #   networks:
+  #     - id
 
 volumes:
   dbdata:
-    name: brvjeoID_dbdata
+    name: id_dbdata
 
 networks:
-  brvjeoID:
+  id:
     driver: bridge

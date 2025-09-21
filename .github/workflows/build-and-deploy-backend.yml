@@ -23,8 +23,8 @@ jobs:
 
       - name: Build and push image
         run: |
-          docker build -f backend/Dockerfile -t cr.yandex/$YC_CONTAINER_REGISTRY/clipboard:$IMAGE_TAG .
-          docker push cr.yandex/$YC_CONTAINER_REGISTRY/clipboard:$IMAGE_TAG
+          docker build -f backend/Dockerfile -t cr.yandex/$YC_CONTAINER_REGISTRY/id:$IMAGE_TAG .
+          docker push cr.yandex/$YC_CONTAINER_REGISTRY/id:$IMAGE_TAG
 
       - name: Deploy COI VM
         id: deploy-coi
@@ -32,22 +32,28 @@ jobs:
         env:
           YC_SSH_LOGIN: ${{ secrets.YC_SSH_LOGIN }}
           YC_SSH_PUBLIC_KEY: ${{ secrets.YC_SSH_PUBLIC_KEY }}
-          IMAGE: cr.yandex/crpkqhak0m8h69pg58ro/clipboard:${{ github.sha }}
+          IMAGE: cr.yandex/crpkqhak0m8h69pg58ro/id:${{ github.sha }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
-          ALLOWED_HOSTS: clipboard.brvjeo.ru,localhost
+          BASE_DOMAIN: ${{ secrets.BASE_DOMAIN }}
+          ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS }}
+          CSRF_TRUSTED_ORIGINS: ${{ secrets.CSRF_TRUSTED_ORIGINS }}
+          CORS_ALLOWED_ORIGINS: ${{ secrets.CORS_ALLOWED_ORIGINS }}
           POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: clipboard
-          DJANGO_SETTINGS_MODULE: clipboard.settings.production
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          DJANGO_SETTINGS_MODULE: ${{ secrets.DJANGO_SETTINGS_MODULE }}
+          DEFENDER_REDIS_URL: "redis://result:6379/1"
+          REDIS_URL: "redis://redis:6379/0"
+          COMPOSE_PROJECT_NAME: "id"
         with:
           yc-sa-json-credentials: ${{ secrets.YC_SA_CREDENTIALS }}
           folder-id: b1gik8v14ivmclu6s0vs
-          vm-name: clipboard
+          vm-name: id
           vm-service-account-id: aje6ibnmefju674ofgld
           vm-cores: 2
           vm-memory: 2GB
           vm-disk-size: 15GB
-          vm-core-fraction: 50
+          vm-core-fraction: 100
           vm-zone-id: ru-central1-d
           vm-subnet-id: fl8rnq3om5ptcbsq4dsr
           user-data-path: "./user-data.yaml"

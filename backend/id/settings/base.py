@@ -74,7 +74,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = "brvjeoID.urls"
+ROOT_URLCONF = "id.urls"
 
 TEMPLATES = [
     {
@@ -100,7 +100,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "brvjeoID.wsgi.application"
+WSGI_APPLICATION = "id.wsgi.application"
 
 # Database
 DATABASES = {
