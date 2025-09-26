@@ -4,7 +4,7 @@ from django.test import TestCase
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 
-from core.authentication.serializers import (
+from id.serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetSerializer,
     UserRegistrationSerializer,
@@ -45,18 +45,28 @@ class UserRegistrationSerializerTest(TestCase):
         serializer = UserRegistrationSerializer(data=data)
         self.assertFalse(serializer.is_valid())
         self.assertIn("password", serializer.errors)
+        self.assertIn("Passwords do not match", str(serializer.errors["password"]))
 
     def test_invalid_passwords(self):
         invalid_passwords = [
-            ("123", "too short"),
-            ("12345678", "entirely numeric"),
+            ("123", ["This password is too short. It must contain at least 8 characters."]),
+            ("12345678", ["This password is entirely numeric."]),
         ]
-        for pwd, desc in invalid_passwords:
-            with self.subTest(desc=desc):
-                data = {"username": f"user_{desc}", "email": f"{desc}@example.com", "password": pwd, "password2": pwd}
+        for pwd, expected_errors in invalid_passwords:
+            with self.subTest(pwd=pwd):
+                data = {
+                    "username": f"user_{pwd}",
+                    "email": f"user_{pwd}@example.com",  # валидный email
+                    "password": pwd,
+                    "password2": pwd
+                }
                 serializer = UserRegistrationSerializer(data=data)
                 self.assertFalse(serializer.is_valid())
                 self.assertIn("password", serializer.errors)
+
+                errors = [str(e) for e in serializer.errors["password"]]
+                for expected_error in expected_errors:
+                    self.assertIn(expected_error, errors)
 
     def test_non_unique_fields(self):
         non_unique_data = [
@@ -65,10 +75,16 @@ class UserRegistrationSerializerTest(TestCase):
         ]
         for username, email, field in non_unique_data:
             with self.subTest(field=field):
-                data = {"username": username, "email": email, "password": "StrongPass123", "password2": "StrongPass123"}
+                data = {
+                    "username": username,
+                    "email": email,
+                    "password": "StrongPass123",
+                    "password2": "StrongPass123"
+                }
                 serializer = UserRegistrationSerializer(data=data)
                 self.assertFalse(serializer.is_valid())
                 self.assertIn(field, serializer.errors)
+                self.assertIsInstance(serializer.errors[field], list)
 
 
 class PasswordResetSerializerTest(TestCase):
@@ -87,6 +103,7 @@ class PasswordResetSerializerTest(TestCase):
         serializer = PasswordResetSerializer(data={"email": "notfound@example.com"})
         self.assertFalse(serializer.is_valid())
         self.assertIn("email", serializer.errors)
+        self.assertIsInstance(serializer.errors["email"], list)
 
 
 class PasswordResetConfirmSerializerTest(TestCase):
@@ -110,14 +127,15 @@ class PasswordResetConfirmSerializerTest(TestCase):
 
     def test_invalid_uid_or_token(self):
         test_cases = [
-            ({"uid": "invalid", "token": self.token, "password": "NewPass123"}, "non_field_errors"),
-            ({"uid": self.uid, "token": "invalid", "password": "NewPass123"}, "non_field_errors"),
+            {"uid": "invalid", "token": self.token, "password": "NewPass123"},
+            {"uid": self.uid, "token": "invalid", "password": "NewPass123"},
         ]
-        for data, error_field in test_cases:
+        for data in test_cases:
             with self.subTest(data=data):
                 serializer = PasswordResetConfirmSerializer(data=data)
                 self.assertFalse(serializer.is_valid())
-                self.assertIn(error_field, serializer.errors)
+                self.assertIn("non_field_errors", serializer.errors)
+                self.assertIsInstance(serializer.errors["non_field_errors"], list)
 
     def test_short_password(self):
         serializer = PasswordResetConfirmSerializer(
@@ -125,3 +143,4 @@ class PasswordResetConfirmSerializerTest(TestCase):
         )
         self.assertFalse(serializer.is_valid())
         self.assertIn("password", serializer.errors)
+        self.assertTrue(len(serializer.errors["password"]) > 0)

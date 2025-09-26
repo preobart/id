@@ -4,9 +4,10 @@ __pycache__/
 *$py.class
 .DS_Store
 .venv
-
+certs
 # C extensions
 *.so
+cookies.txt
 
 # Distribution / packaging
 .Python

@@ -34,12 +34,10 @@ def register_view(request):
     serializer = UserRegistrationSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
-        logger.info("New user registered: %s", user.username)
         return Response(
             {"user": UserSerializer(user).data},
             status=status.HTTP_201_CREATED,
         )
-    logger.warning("Failed registration attempt: %s", serializer.errors)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(["POST"])
@@ -50,18 +48,16 @@ def login_view(request):
     password = request.data.get("password")
     user = authenticate(request, username=username, password=password)
     if user is None:
-        logger.warning("Failed login attempt for username: %s", username)
         return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
     login(request, user)
-    logger.info("User logged in: %s", username)
     return Response(
         {"user": UserSerializer(user).data},
         status=status.HTTP_200_OK,
     )
 
 @api_view(["POST"])
+@permission_classes([AllowAny])
 def logout_view(request):
-    logger.info("User logged out: %s", request.user.username if request.user.is_authenticated else "anonymous")
     logout(request)
     return Response({"message": "Logged out"})
 
@@ -77,20 +73,18 @@ def password_reset_view(request):
     serializer = PasswordResetSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.user
-        logger.info("Password reset requested for user: %s", user.username)
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
-        reset_link = f"{request.build_absolute_uri('/password-reset-confirm/')}{uid}/{token}/"
+        reset_link = f"{request.build_absolute_uri('/auth/password-reset-confirm/')}?uid={uid}&token={token}"
 
         send_mail(
             subject="Password Reset",
             message=f"Click the link to reset your password: {reset_link}",
-            from_email=None,  # Use default
+            from_email=None,
             recipient_list=[user.email],
         )
 
         return Response({"detail": ("Password reset email has been sent.")}, status=status.HTTP_200_OK)
-    logger.warning("Failed password reset attempt: %s", serializer.errors)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(["POST"])
@@ -100,7 +94,5 @@ def password_reset_confirm_view(request):
     serializer = PasswordResetConfirmSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
-        logger.info("Password successfully reset for user")
         return Response({"detail": ("Password has been reset successfully")}, status=status.HTTP_200_OK)
-    logger.warning("Failed password reset confirm attempt: %s", serializer.errors)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

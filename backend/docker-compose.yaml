@@ -18,17 +18,6 @@
       timeout: 5s
       retries: 5
 
-  # broker:
-  #   image: "rabbitmq:alpine"
-  #   restart: always
-  #   networks:
-  #     - id
-  #   healthcheck:
-  #     test: ["CMD", "rabbitmq-diagnostics", "check_running"]
-  #     interval: 5s
-  #     timeout: 10s
-  #     retries: 5
-
   result:
     image: "redis:alpine"
     restart: always
@@ -44,15 +33,7 @@
       sh -c "
         python manage.py makemigrations --dry-run --check &&
         python manage.py migrate --no-input &&
-        gunicorn id.wsgi:application \
-          --bind 0.0.0.0:8081 \
-          --access-logfile - \
-          --error-logfile - \
-          --capture-output \
-          --log-level info \
-          --workers 2 \
-          --timeout 120 \
-          --reload
+        python manage.py runserver_plus 0.0.0.0:8081 --cert-file certs/cert.pem --key-file certs/key.pem
       "
     ports:
       - "8081:8081"
@@ -76,6 +57,10 @@
       PORT: 8081
     networks:
       - id
+    volumes:
+      - .:/app/backend
+      - /app/.venv
+    
 
   # celery:
   #   build:
@@ -128,6 +113,17 @@
   #     REDIS_URL: ${REDIS_URL}
   #   networks:
   #     - id
+
+    # broker:
+  #   image: "rabbitmq:alpine"
+  #   restart: always
+  #   networks:
+  #     - id
+  #   healthcheck:
+  #     test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+  #     interval: 5s
+  #     timeout: 10s
+  #     retries: 5
 
 volumes:
   dbdata:
