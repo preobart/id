@@ -5,6 +5,8 @@ SECRET_KEY = "test"  # nosec
 DEBUG = True
 ALLOWED_HOSTS = ["localhost"]
 
+logging.disable(logging.INFO)
+
 STATIC_ROOT = base_dir_join("staticfiles")
 STATIC_URL = "/static/"
 
