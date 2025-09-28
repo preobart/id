@@ -5,7 +5,7 @@ from decimal import Decimal
 MAX_BODY_BYTES = 10 * 1024
 SENSITIVE_KEYWORDS = ("pass", "token", "secret", "auth", "key", "refresh", "access")
 
-def _is_sensitive_key(key: str) -> bool:
+def _is_sensitive_key(key):
     if not isinstance(key, str):
         return False
     lower = key.lower()

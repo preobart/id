@@ -20,6 +20,11 @@ from .serializers import (
 
 User = get_user_model()
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+@ensure_csrf_cookie
+def csrf_view(request):
+    return Response({"detail": "CSRF cookie set"}, status=status.HTTP_200_OK)
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
