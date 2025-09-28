@@ -160,8 +160,8 @@ CSRF_TRUSTED_ORIGINS = []
 
 # Ensures the cookie is sent only over HTTPS.
 # Specifies the domains allowed to submit requests with a valid CSRF token.
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
 
 # Stores sessions in Redis cache using the default cache, with a one-week expiration.
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
@@ -199,7 +199,7 @@ SIMPLE_JWT = {
     # Cookie-based settings
     "AUTH_COOKIE": "jwt",
     "AUTH_COOKIE_DOMAIN": BASE_DOMAIN,
-    "AUTH_COOKIE_SECURE": True,
+    "AUTH_COOKIE_SECURE": False,
     "AUTH_COOKIE_HTTP_ONLY": False,
     "AUTH_COOKIE_PATH": "/",
     "AUTH_COOKIE_SAMESITE": "Lax",
@@ -249,13 +249,13 @@ DEFENDER_STORE_ACCESS_ATTEMPTS = False
 
 # Enables HTTPS with HSTS (including subdomains and preload), redirects HTTP to HTTPS,
 # and sets security headers to prevent MIME sniffing, XSS, and clickjacking.
-SECURE_HSTS_SECONDS = 31536000
-SECURE_HSTS_PRELOAD = True
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-SECURE_SSL_REDIRECT = True
-SECURE_CONTENT_TYPE_NOSNIFF = True
-SECURE_BROWSER_XSS_FILTER = True
+SECURE_HSTS_SECONDS = 0
+SECURE_HSTS_PRELOAD = False
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+SECURE_PROXY_SSL_HEADER = None
+SECURE_SSL_REDIRECT = False
+SECURE_CONTENT_TYPE_NOSNIFF = False
+SECURE_BROWSER_XSS_FILTER = False
 X_FRAME_OPTIONS = "DENY"
 
 # Email settings
