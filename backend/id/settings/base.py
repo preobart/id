@@ -54,7 +54,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
-    'rest_framework.authtoken',
+    "rest_framework.authtoken",
     "djoser",
     "django_celery_beat",
     "defender",
@@ -72,6 +72,7 @@ MIDDLEWARE = [
     "defender.middleware.FailedLoginMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "id.middleware.LoggingMiddleware",
 ]
 
 ROOT_URLCONF = "id.urls"
@@ -127,17 +128,16 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # DRF
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework.authentication.SessionAuthentication",
-                                       "rest_framework_simplejwt.authentication.JWTAuthentication",),
-    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
-    'DEFAULT_THROTTLE_CLASSES': (
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle'
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': '60/min',
-        'user': '100/min'
-    }
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+    "DEFAULT_THROTTLE_CLASSES": (
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ),
+    "DEFAULT_THROTTLE_RATES": {"anon": "60/min", "user": "100/min"},
 }
 
 # SSO via Cookies
@@ -148,7 +148,7 @@ SESSION_COOKIE_DOMAIN = BASE_DOMAIN
 CSRF_COOKIE_DOMAIN = BASE_DOMAIN
 
 # Lax allows the cookie to be sent on safe cross-site requests
-SESSION_COOKIE_SAMESITE = "Lax" 
+SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
 
 # Stores the CSRF token in a cookie (not in sessions) and allows frontend JavaScript to read it for AJAX requests.
@@ -196,20 +196,19 @@ SIMPLE_JWT = {
     "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
-
     # Cookie-based settings
     "AUTH_COOKIE": "jwt",
-    "AUTH_COOKIE_DOMAIN": BASE_DOMAIN, 
-    "AUTH_COOKIE_SECURE": True,     
-    "AUTH_COOKIE_HTTP_ONLY": False,      
-    "AUTH_COOKIE_PATH": "/",              
+    "AUTH_COOKIE_DOMAIN": BASE_DOMAIN,
+    "AUTH_COOKIE_SECURE": True,
+    "AUTH_COOKIE_HTTP_ONLY": False,
+    "AUTH_COOKIE_PATH": "/",
     "AUTH_COOKIE_SAMESITE": "Lax",
 }
 
 DJOSER = {
-    'TOKEN_MODEL': None,
-    'SERIALIZERS': {},
-    'JWT_AUTH_COOKIE': "jwt",  
+    "TOKEN_MODEL": None,
+    "SERIALIZERS": {},
+    "JWT_AUTH_COOKIE": "jwt",
 }
 
 # Internationalization
@@ -293,24 +292,37 @@ CELERY_WORKER_SEND_TASK_EVENTS = env("CELERY_WORKER_SEND_TASK_EVENTS", "true")
 
 CELERY_EVENT_QUEUE_EXPIRES = float(env("CELERY_EVENT_QUEUE_EXPIRES", 60.0))
 CELERY_EVENT_QUEUE_TTL = float(env("CELERY_EVENT_QUEUE_TTL", 5.0))
-
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "standard": {
-            "format": "%(levelname)-8s [%(asctime)s] %(name)s: %(message)s"
+        "json": {
+            "()": "logging.Formatter",
+            "fmt": "%(message)s",
         },
     },
     "handlers": {
         "console": {
-            "level": "DEBUG",
+            "level": "INFO",
             "class": "logging.StreamHandler",
-            "formatter": "standard",
+            "formatter": "json",
         },
     },
-    "root": {
-        "handlers": ["console"],
-        "level": "DEBUG",
+    "loggers": {
+        "json": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.server": {
+            "handlers": [],  # отключаем вывод
+            "level": "ERROR",
+            "propagate": False,
+        },
     },
 }
+
+import logging.config
+
+
+logging.config.dictConfig(LOGGING)

@@ -49,4 +49,3 @@ CACHES = {
         "LOCATION": "unique-test",
     }
 }
-

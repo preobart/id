@@ -13,7 +13,6 @@ User = get_user_model()
 
 
 class ViewTests(APITestCase):
-
     def setUp(self):
         self.client = APIClient()
 

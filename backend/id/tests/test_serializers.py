@@ -15,7 +15,6 @@ User = get_user_model()
 
 
 class UserRegistrationSerializerTest(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.existing_user = User.objects.create_user(
@@ -58,7 +57,7 @@ class UserRegistrationSerializerTest(TestCase):
                     "username": f"user_{pwd}",
                     "email": f"user_{pwd}@example.com",  # валидный email
                     "password": pwd,
-                    "password2": pwd
+                    "password2": pwd,
                 }
                 serializer = UserRegistrationSerializer(data=data)
                 self.assertFalse(serializer.is_valid())
@@ -79,7 +78,7 @@ class UserRegistrationSerializerTest(TestCase):
                     "username": username,
                     "email": email,
                     "password": "StrongPass123",
-                    "password2": "StrongPass123"
+                    "password2": "StrongPass123",
                 }
                 serializer = UserRegistrationSerializer(data=data)
                 self.assertFalse(serializer.is_valid())
@@ -88,7 +87,6 @@ class UserRegistrationSerializerTest(TestCase):
 
 
 class PasswordResetSerializerTest(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user(
@@ -107,7 +105,6 @@ class PasswordResetSerializerTest(TestCase):
 
 
 class PasswordResetConfirmSerializerTest(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user(

@@ -1,5 +1,3 @@
-import logging
-
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
@@ -20,10 +18,6 @@ from .serializers import (
 )
 
 
-logger = logging.getLogger(__name__)
-
-
-
 User = get_user_model()
 
 
@@ -40,6 +34,7 @@ def register_view(request):
         )
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @ensure_csrf_cookie
@@ -55,16 +50,19 @@ def login_view(request):
         status=status.HTTP_200_OK,
     )
 
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def logout_view(request):
     logout(request)
     return Response({"message": "Logged out"})
 
+
 @api_view(["GET"])
 def userinfo_view(request):
     serializer = UserSerializer(request.user)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -75,7 +73,9 @@ def password_reset_view(request):
         user = serializer.user
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
-        reset_link = f"{request.build_absolute_uri('/auth/password-reset-confirm/')}?uid={uid}&token={token}"
+        reset_link = (
+            f"{request.build_absolute_uri('/auth/password-reset-confirm/')}?uid={uid}&token={token}"
+        )
 
         send_mail(
             subject="Password Reset",
@@ -84,8 +84,11 @@ def password_reset_view(request):
             recipient_list=[user.email],
         )
 
-        return Response({"detail": ("Password reset email has been sent.")}, status=status.HTTP_200_OK)
+        return Response(
+            {"detail": ("Password reset email has been sent.")}, status=status.HTTP_200_OK
+        )
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -94,5 +97,7 @@ def password_reset_confirm_view(request):
     serializer = PasswordResetConfirmSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
-        return Response({"detail": ("Password has been reset successfully")}, status=status.HTTP_200_OK)
+        return Response(
+            {"detail": ("Password has been reset successfully")}, status=status.HTTP_200_OK
+        )
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

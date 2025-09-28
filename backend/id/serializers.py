@@ -1,4 +1,4 @@
-﻿from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -19,8 +19,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         required=True,
         validators=[
             UniqueValidator(
-                queryset=User.objects.all(),
-                message=["User with this username already exists"]
+                queryset=User.objects.all(), message=["User with this username already exists"]
             )
         ],
     )
@@ -28,8 +27,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         required=True,
         validators=[
             UniqueValidator(
-                queryset=User.objects.all(),
-                message=["User with this email already exists"]
+                queryset=User.objects.all(), message=["User with this email already exists"]
             )
         ],
     )
@@ -71,8 +69,8 @@ class PasswordResetSerializer(serializers.Serializer):
     def validate_email(self, email):
         try:
             self.user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            raise serializers.ValidationError(["User with this email does not exist"])
+        except User.DoesNotExist as e:
+            raise serializers.ValidationError(["User with this email does not exist"]) from e
         return email
 
 
@@ -86,9 +84,9 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         try:
             uid = force_str(urlsafe_base64_decode(attrs["uid"]))
             user = User.objects.get(pk=uid)
-        except (TypeError, ValueError, User.DoesNotExist):
+        except (TypeError, ValueError, User.DoesNotExist) as e:
             errors["non_field_errors"] = ["Invalid user identification"]
-            raise serializers.ValidationError(errors)
+            raise serializers.ValidationError(errors) from e
 
         if not default_token_generator.check_token(user, attrs["token"]):
             errors["non_field_errors"] = ["Invalid or expired token"]
@@ -98,7 +96,7 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
             validate_password(attrs["password"], user)
         except DjangoValidationError as e:
             errors["password"] = e.messages
-            raise serializers.ValidationError(errors)
+            raise serializers.ValidationError(errors) from e
 
         attrs["user"] = user
         return attrs
