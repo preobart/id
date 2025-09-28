@@ -42,9 +42,11 @@ jobs:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
           DJANGO_SETTINGS_MODULE: ${{ secrets.DJANGO_SETTINGS_MODULE }}
-          DEFENDER_REDIS_URL: "redis://result:6379/1"
-          REDIS_URL: "redis://redis:6379/0"
-          COMPOSE_PROJECT_NAME: "id"
+          DEFENDER_REDIS_URL: ${{ secrets.DEFENDER_REDIS_URL }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
+          EMAIL_HOST_USER: ${{ secrets.EMAIL_HOST_USER }}
+          COMPOSE_PROJECT_NAME: ${{ secrets.COMPOSE_PROJECT_NAME }}
         with:
           yc-sa-json-credentials: ${{ secrets.YC_SA_CREDENTIALS }}
           folder-id: b1gik8v14ivmclu6s0vs

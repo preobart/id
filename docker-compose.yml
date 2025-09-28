@@ -59,9 +59,11 @@ services:
       POSTGRES_USER: {{ env.POSTGRES_USER }}
       POSTGRES_PASSWORD: {{ env.POSTGRES_PASSWORD }}
       POSTGRES_DB: {{ env.POSTGRES_DB }}
-      DEFENDER_REDIS_URL: "redis://result:6379/1"
-      REDIS_URL: "redis://redis:6379/0"
-      COMPOSE_PROJECT_NAME: "id"
+      DEFENDER_REDIS_URL: {{ env.DEFENDER_REDIS_URL }}
+      REDIS_URL: {{ env.REDIS_URL }}
+      EMAIL_HOST_PASSWORD: {{ env.EMAIL_HOST_PASSWORD }}
+      EMAIL_HOST_USER: {{ env.EMAIL_HOST_USER }}
+      COMPOSE_PROJECT_NAME: {{ env.COMPOSE_PROJECT_NAME }}
       PORT: 8081
     networks:
       - backend

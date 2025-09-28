@@ -7,7 +7,7 @@ __pycache__/
 certs
 # C extensions
 *.so
-cookies.txt
+**cookies.txt
 
 # Distribution / packaging
 .Python
