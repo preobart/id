@@ -34,15 +34,7 @@
         python manage.py makemigrations --dry-run --check &&
         python manage.py migrate --no-input &&
         # python manage.py runserver_plus 0.0.0.0:8081 --cert-file certs/cert.pem --key-file certs/key.pem
-        gunicorn id.wsgi:application \
-          --bind 0.0.0.0:8081 \
-          --access-logfile - \
-          --error-logfile - \
-          --capture-output \
-          --log-level info \
-          --workers 2 \
-          --timeout 120 \
-          --reload
+        python manage.py runserver 0.0.0.0:8081
       "
     ports:
       - "8081:8081"

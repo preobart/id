@@ -25,3 +25,38 @@ MEDIA_URL = "/media/"
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="")
 CELERY_RESULT_BACKEND = env("REDIS_URL")
 CELERY_SEND_TASK_ERROR_EMAILS = True
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": "logging.Formatter",
+            "fmt": "%(message)s",
+        },
+    },
+    "handlers": {
+        "console": {
+            "level": "INFO",
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+        },
+    },
+    "loggers": {
+        "json": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.server": {
+            "handlers": [],  # отключаем вывод
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
+
+import logging.config
+
+
+logging.config.dictConfig(LOGGING)

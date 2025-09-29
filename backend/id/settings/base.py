@@ -69,7 +69,6 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "defender.middleware.FailedLoginMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "id.middleware.LoggingMiddleware",
@@ -172,7 +171,13 @@ CACHES = {
         "LOCATION": env("REDIS_URL", "redis://127.0.0.1:6379/0"),
         "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
         "TIMEOUT": 60 * 60 * 24 * 7,
-    }
+    },
+     "defender": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": env("DEFENDER_REDIS_URL", "redis://127.0.0.1:6379/1"),
+        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+        "TIMEOUT": 60 * 60 * 24,
+    },
 }
 
 # Specifies which origins are allowed to make cross-origin requests.
@@ -238,14 +243,15 @@ PERMISSIONS_POLICY = {
 }
 
 # Defender settings
-DEFENDER_REDIS_URL = os.getenv("DEFENDER_REDIS_URL")
-DEFENDER_COOLOFF_TIME = 60
+DEFENDER_REDIS_NAME = "defender"
 
 # Number of failed login attempts before a user is locked out.
 # django-defender checks the lock *after* recording a failed attempt,
 # so the actual lock happens 1 attempt later than this number.
-DEFENDER_LOGIN_FAILURE_LIMIT = 3
-DEFENDER_STORE_ACCESS_ATTEMPTS = False
+DEFENDER_LOGIN_FAILURE_LIMIT = 2
+DEFENDER_STORE_ACCESS_ATTEMPTS = False  # БД не используется
+DEFENDER_COOLOFF_TIME = 10
+DEFENDER_USE_CELERY = False
 
 # Enables HTTPS with HSTS (including subdomains and preload), redirects HTTP to HTTPS,
 # and sets security headers to prevent MIME sniffing, XSS, and clickjacking.
@@ -292,39 +298,3 @@ CELERY_WORKER_SEND_TASK_EVENTS = env("CELERY_WORKER_SEND_TASK_EVENTS", "true")
 
 CELERY_EVENT_QUEUE_EXPIRES = float(env("CELERY_EVENT_QUEUE_EXPIRES", 60.0))
 CELERY_EVENT_QUEUE_TTL = float(env("CELERY_EVENT_QUEUE_TTL", 5.0))
-
-
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "json": {
-            "()": "logging.Formatter",
-            "fmt": "%(message)s",
-        },
-    },
-    "handlers": {
-        "console": {
-            "level": "INFO",
-            "class": "logging.StreamHandler",
-            "formatter": "json",
-        },
-    },
-    "loggers": {
-        "json": {
-            "handlers": ["console"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "django.server": {
-            "handlers": [],  # отключаем вывод
-            "level": "ERROR",
-            "propagate": False,
-        },
-    },
-}
-
-import logging.config
-
-
-logging.config.dictConfig(LOGGING)

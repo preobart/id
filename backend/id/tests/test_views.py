@@ -64,12 +64,12 @@ class ViewTests(APITestCase):
         self.client.force_authenticate(user=self.user)
         response = self.client.post(self.logout_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["message"], "Logged out")
+        self.assertEqual(response.data["detail"], "Logged out")
 
     def test_logout_unauthenticated(self):
         response = self.client.post(self.logout_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["message"], "Logged out")
+        self.assertEqual(response.data["detail"], "Logged out")
 
     def test_get_user_data_authenticated(self):
         self.client.force_authenticate(user=self.user)

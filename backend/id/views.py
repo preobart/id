@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
@@ -5,6 +6,7 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.views.decorators.csrf import ensure_csrf_cookie
 
+from defender import utils
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -46,21 +48,33 @@ def register_view(request):
 def login_view(request):
     username = request.data.get("username")
     password = request.data.get("password")
+    failure_limit = getattr(settings, "DEFENDER_LOGIN_FAILURE_LIMIT", 2)
+    cooloff_time = utils.get_lockout_cooloff_time(ip_address=utils.get_ip(request), username=username)
+    lockout_detail = (
+        f"You have attempted to login {failure_limit + 1} times with no success. "
+        f"Your account is locked for {cooloff_time} seconds."
+    )
+
+    if utils.is_already_locked(request, get_username=lambda r: username):
+        return Response({"detail": lockout_detail}, status=status.HTTP_403_FORBIDDEN)
+
     user = authenticate(request, username=username, password=password)
+    
+    if not utils.check_request(request, user is None, get_username=lambda r: username):
+        return Response({"detail": lockout_detail}, status=status.HTTP_403_FORBIDDEN)
+
     if user is None:
         return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+
     login(request, user)
-    return Response(
-        {"user": UserSerializer(user).data},
-        status=status.HTTP_200_OK,
-    )
+    return Response({"user": UserSerializer(user).data}, status=status.HTTP_200_OK)
 
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def logout_view(request):
     logout(request)
-    return Response({"message": "Logged out"})
+    return Response({"detail": "Logged out"})
 
 
 @api_view(["GET"])
