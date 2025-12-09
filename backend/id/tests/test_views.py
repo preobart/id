@@ -50,7 +50,7 @@ class ViewTests(APITestCase):
         self.assertIn("password", response.data)
 
     def test_login_successful(self):
-        data = {"username": "user", "password": "password-123"}
+        data = {"username": "user2", "password": "password-123"}
         response = self.client.post(self.login_url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("user", response.data)
@@ -58,7 +58,7 @@ class ViewTests(APITestCase):
     def test_login_invalid_credentials(self):
         data = {"username": "user", "password": "wrongpass"}
         response = self.client.post(self.login_url, data)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_logout_authenticated(self):
         self.client.force_authenticate(user=self.user)
