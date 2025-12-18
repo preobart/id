@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
+from django.middleware.csrf import get_token
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -26,7 +27,10 @@ User = get_user_model()
 @permission_classes([AllowAny])
 @ensure_csrf_cookie
 def csrf_view(request):
-    return Response({"detail": "CSRF cookie set"}, status=status.HTTP_200_OK)
+    return Response({
+        "token": get_token(request)
+    }, status=status.HTTP_200_OK)
+
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
