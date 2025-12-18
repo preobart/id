@@ -37,7 +37,7 @@
         python manage.py runserver 0.0.0.0:8081
       "
     ports:
-      - "8081:8081"
+      - "80:8081"
     depends_on:
       db:
         condition: service_healthy
