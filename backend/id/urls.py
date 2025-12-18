@@ -10,14 +10,14 @@ urlpatterns = [
         "auth/",
         include(
             [
-                path("register/", views.register_view, name="register"),
-                path("login/", views.login_view, name="login"),
-                path("logout/", views.logout_view, name="logout"),
-                path("csrf/", views.csrf_view, name="csrf"),
-                path("userinfo/", views.userinfo_view, name="userinfo"),
-                path("password-reset/", views.password_reset_view, name="password-reset"),
+                path("register", views.register_view, name="register"),
+                path("login", views.login_view, name="login"),
+                path("logout", views.logout_view, name="logout"),
+                path("csrf", views.csrf_view, name="csrf"),
+                path("userinfo", views.userinfo_view, name="userinfo"),
+                path("password-reset", views.password_reset_view, name="password-reset"),
                 path(
-                    "password-reset-confirm/",
+                    "password-reset-confirm",
                     views.password_reset_confirm_view,
                     name="password-reset-confirm",
                 ),
