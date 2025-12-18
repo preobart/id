@@ -15,6 +15,7 @@ CSRF_TRUSTED_ORIGINS = [
     origin for origin in env("CSRF_TRUSTED_ORIGINS", "").split(",") if origin
 ]
 CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_DOMAIN = None
 
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
 
