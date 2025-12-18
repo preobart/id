@@ -18,7 +18,7 @@
       timeout: 5s
       retries: 5
 
-  result:
+  redis:
     image: "redis:alpine"
     restart: always
     networks:
@@ -43,7 +43,7 @@
         condition: service_healthy
       # broker:
       #   condition: service_healthy
-      result:
+      redis:
         condition: service_started
     environment:
       DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE}

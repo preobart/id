@@ -40,8 +40,8 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     if r
 ]
 
-CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS", [""]).split(",")
-CSRF_TRUSTED_ORIGINS += [
+
+CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8082",
     "http://localhost:8082",
 ]
