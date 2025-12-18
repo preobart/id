@@ -4,7 +4,11 @@ on:
   workflow_dispatch:
 
 env:
-  YC_CONTAINER_REGISTRY: crpkqhak0m8h69pg58ro
+  YC_CONTAINER_REGISTRY: crpv2r10hb8nfdu036ra
+  YC_FOLDER_ID: b1g334up5rkb8rndusqb
+  YC_SA_ID: ajefdd60ehm2jkkei8to
+  YC_SUBNET_ID: fl8amft6eg8nttnofpt4
+  YC_SEC_GROUP_IDS: enp4tnnrb6qibitllph4
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
@@ -23,16 +27,16 @@ jobs:
 
       - name: Build and push image
         run: |
-          docker build -t cr.yandex/$YC_CONTAINER_REGISTRY/id:$IMAGE_TAG .
-          docker push cr.yandex/$YC_CONTAINER_REGISTRY/id:$IMAGE_TAG
+          docker build -t cr.yandex/$YC_CONTAINER_REGISTRY/id-backend:$IMAGE_TAG .
+          docker push cr.yandex/$YC_CONTAINER_REGISTRY/id-backend:$IMAGE_TAG
 
       - name: Deploy COI VM
         id: deploy-coi
-        uses: yc-actions/yc-coi-deploy@v2
+        uses: brvjeo/yc-coi-deploy@v3.0.2
         env:
           YC_SSH_LOGIN: ${{ secrets.YC_SSH_LOGIN }}
           YC_SSH_PUBLIC_KEY: ${{ secrets.YC_SSH_PUBLIC_KEY }}
-          IMAGE: cr.yandex/crpkqhak0m8h69pg58ro/id:${{ github.sha }}
+          IMAGE: cr.yandex/${{ env.YC_CONTAINER_REGISTRY }}/id-backend:${{ github.sha }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           BASE_DOMAIN: ${{ secrets.BASE_DOMAIN }}
           ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS }}
@@ -49,14 +53,16 @@ jobs:
           COMPOSE_PROJECT_NAME: ${{ secrets.COMPOSE_PROJECT_NAME }}
         with:
           yc-sa-json-credentials: ${{ secrets.YC_SA_CREDENTIALS }}
-          folder-id: b1gik8v14ivmclu6s0vs
-          vm-name: id
-          vm-service-account-id: aje6ibnmefju674ofgld
+          folder-id: ${{ env.YC_FOLDER_ID }}
+          vm-name: id-backend
+          vm-service-account-id: ${{ env.YC_SA_ID }}
           vm-cores: 2
           vm-memory: 2GB
           vm-disk-size: 15GB
-          vm-core-fraction: 100
+          vm-core-fraction: 50
           vm-zone-id: ru-central1-d
-          vm-subnet-id: fl8rnq3om5ptcbsq4dsr
+          vm-subnet-id: ${{ env.YC_SUBNET_ID }}
+          vm-use-nat: false
+          vm-security-group-ids: ${{ env.YC_SEC_GROUP_IDS }}
           user-data-path: "./user-data.yaml"
           docker-compose-path: "./docker-compose.yml"
