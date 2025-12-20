@@ -49,21 +49,21 @@ def register_view(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def login_view(request):
-    username = request.data.get("username")
+    email = request.data.get("email")
     password = request.data.get("password")
     failure_limit = getattr(settings, "DEFENDER_LOGIN_FAILURE_LIMIT", 2)
-    cooloff_time = utils.get_lockout_cooloff_time(ip_address=utils.get_ip(request), username=username)
+    cooloff_time = utils.get_lockout_cooloff_time(ip_address=utils.get_ip(request), username=email)
     lockout_detail = (
         f"You have attempted to login {failure_limit + 1} times with no success. "
         f"Your account is locked for {cooloff_time} seconds."
     )
 
-    if utils.is_already_locked(request, get_username=lambda r: username):
+    if utils.is_already_locked(request, get_username=lambda r: email):
         return Response({"detail": lockout_detail}, status=status.HTTP_403_FORBIDDEN)
 
-    user = authenticate(request, username=username, password=password)
+    user = authenticate(request, username=email, password=password)
     
-    if not utils.check_request(request, user is None, get_username=lambda r: username):
+    if not utils.check_request(request, user is None, get_username=lambda r: email):
         return Response({"detail": lockout_detail}, status=status.HTTP_403_FORBIDDEN)
 
     if user is None:
