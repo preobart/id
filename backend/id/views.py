@@ -39,6 +39,7 @@ def register_view(request):
     serializer = UserRegistrationSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
+        login(request, user) 
         return Response(
             {"user": UserSerializer(user).data},
             status=status.HTTP_201_CREATED,
