@@ -15,14 +15,8 @@ User = get_user_model()
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     password2 = serializers.CharField(write_only=True)
-    username = serializers.CharField(
-        required=True,
-        validators=[
-            UniqueValidator(
-                queryset=User.objects.all(), message=["User with this username already exists"]
-            )
-        ],
-    )
+    first_name = serializers.CharField(required=True)
+    last_name = serializers.CharField(required=True)
     email = serializers.EmailField(
         required=True,
         validators=[
@@ -34,7 +28,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("username", "email", "password", "password2")
+        fields = ("first_name", "last_name", "email", "password", "password2")
 
     def validate(self, data):
         errors = {}
@@ -53,6 +47,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop("password2")
+        validated_data["username"] = validated_data["email"]
         user = User.objects.create_user(**validated_data)
         return user
 
@@ -60,7 +55,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("id", "username", "email")
+        fields = ("id", "first_name", "last_name", "email")
 
 
 class PasswordResetSerializer(serializers.Serializer):
