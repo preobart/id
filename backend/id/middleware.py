@@ -2,6 +2,7 @@
 import logging
 import time
 import uuid
+from datetime import datetime, timezone
 
 from .utils import mask_sensitive
 
@@ -19,6 +20,7 @@ class LoggingMiddleware:
         request_id = request.META.get("HTTP_X_REQUEST_ID") or str(uuid.uuid4())
 
         base = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": "INFO",
             "event": "request",
             "request_id": request_id,
@@ -48,6 +50,7 @@ class LoggingMiddleware:
         except Exception as exc:
             duration = round(time.perf_counter() - start, 3)
             err_log = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "level": "ERROR",
                 "event": "exception",
                 "request_id": request_id,
@@ -60,6 +63,7 @@ class LoggingMiddleware:
 
         duration = round(time.perf_counter() - start, 3)
         resp_log = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": "INFO",
             "event": "response",
             "request_id": request_id,
