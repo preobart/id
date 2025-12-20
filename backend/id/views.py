@@ -34,7 +34,6 @@ def csrf_view(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-@ensure_csrf_cookie
 def register_view(request):
     serializer = UserRegistrationSerializer(data=request.data)
     if serializer.is_valid():
@@ -49,7 +48,6 @@ def register_view(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-@ensure_csrf_cookie
 def login_view(request):
     username = request.data.get("username")
     password = request.data.get("password")
@@ -90,7 +88,6 @@ def userinfo_view(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-@ensure_csrf_cookie
 def password_reset_view(request):
     serializer = PasswordResetSerializer(data=request.data)
     if serializer.is_valid():
@@ -116,7 +113,6 @@ def password_reset_view(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-@ensure_csrf_cookie
 def password_reset_confirm_view(request):
     serializer = PasswordResetConfirmSerializer(data=request.data)
     if serializer.is_valid():
