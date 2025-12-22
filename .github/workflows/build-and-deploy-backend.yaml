@@ -32,7 +32,7 @@ jobs:
 
       - name: Deploy COI VM
         id: deploy-coi
-        uses: brvjeo/yc-coi-deploy@v3.0.2
+        uses: brvjeo/yc-coi-deploy@v3.0.4
         env:
           YC_SSH_LOGIN: ${{ secrets.YC_SSH_LOGIN }}
           YC_SSH_PUBLIC_KEY: ${{ secrets.YC_SSH_PUBLIC_KEY }}
