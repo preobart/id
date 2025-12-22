@@ -34,8 +34,6 @@ jobs:
         id: deploy-coi
         uses: brvjeo/yc-coi-deploy@v3.0.4
         env:
-          YC_SSH_LOGIN: ${{ secrets.YC_SSH_LOGIN }}
-          YC_SSH_PUBLIC_KEY: ${{ secrets.YC_SSH_PUBLIC_KEY }}
           IMAGE: cr.yandex/${{ env.YC_CONTAINER_REGISTRY }}/id-backend:${{ github.sha }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           BASE_DOMAIN: ${{ secrets.BASE_DOMAIN }}
@@ -64,5 +62,4 @@ jobs:
           vm-subnet-id: ${{ env.YC_SUBNET_ID }}
           vm-use-nat: false
           vm-security-group-ids: ${{ env.YC_SEC_GROUP_IDS }}
-          user-data-path: "./user-data.yaml"
           docker-compose-path: "./docker-compose.yml"

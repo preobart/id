@@ -1,7 +1,0 @@
-users:
-  - name: {{ env.YC_SSH_LOGIN }}
-    groups: sudo
-    shell: /bin/bash
-    sudo: ['ALL=(ALL) NOPASSWD:ALL']
-    ssh-authorized-keys:
-      - {{ env.YC_SSH_PUBLIC_KEY }}
