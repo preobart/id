@@ -1,13 +1,13 @@
 ﻿services:
   db:
-    image: postgres:17-alpine
+    image: postgres:16-alpine
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5434:5432"
+      - "5432:5432"
     volumes:
       - dbdata:/var/lib/postgresql/data
     networks:
@@ -33,28 +33,37 @@
       sh -c "
         python manage.py makemigrations --dry-run --check &&
         python manage.py migrate --no-input &&
-        # python manage.py runserver_plus 0.0.0.0:8081 --cert-file certs/cert.pem --key-file certs/key.pem
-        python manage.py runserver 0.0.0.0:8081
+        gunicorn id.wsgi:application \
+          --bind 0.0.0.0:8081 \
+          --access-logfile - \
+          --error-logfile - \
+          --capture-output \
+          --log-level info \
+          --workers 2 \
+          --timeout 120 \
+          --reload
       "
     ports:
       - "80:8081"
     depends_on:
       db:
         condition: service_healthy
-      # broker:
-      #   condition: service_healthy
       redis:
         condition: service_started
     environment:
       DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE}
       SECRET_KEY: ${SECRET_KEY}
+      BASE_DOMAIN: ${BASE_DOMAIN}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
+      CORS_ALLOWED_ORIGIN_REGEXES: ${CORS_ALLOWED_ORIGIN_REGEXES}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
       DEFENDER_REDIS_URL: ${DEFENDER_REDIS_URL}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
       REDIS_URL: ${REDIS_URL}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER}
       PORT: 8081
     networks:
       - id
@@ -115,7 +124,7 @@
   #   networks:
   #     - id
 
-    # broker:
+  # broker:
   #   image: "rabbitmq:alpine"
   #   restart: always
   #   networks:

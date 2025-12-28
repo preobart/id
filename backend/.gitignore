@@ -8,6 +8,7 @@ certs
 # C extensions
 *.so
 **cookies.txt
+.cursor
 
 # Distribution / packaging
 .Python
