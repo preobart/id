@@ -1,6 +1,7 @@
 name: Build and deploy backend
 
 on:
+  push:
   workflow_dispatch:
 
 env:
@@ -9,15 +10,20 @@ env:
   YC_SA_ID: ajefdd60ehm2jkkei8to
   YC_SUBNET_ID: fl8amft6eg8nttnofpt4
   YC_SEC_GROUP_IDS: enp4tnnrb6qibitllph4
-  IMAGE_TAG: ${{ github.sha }}
+  VERSION: 1.0.${{ github.run_number }}
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write
+
     steps:
       - name: checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Login to Yandex Cloud Container Registry
         id: login-cr
@@ -27,8 +33,8 @@ jobs:
 
       - name: Build and push image
         run: |
-          docker build -t cr.yandex/$YC_CONTAINER_REGISTRY/id-backend:$IMAGE_TAG .
-          docker push cr.yandex/$YC_CONTAINER_REGISTRY/id-backend:$IMAGE_TAG
+          docker build -t cr.yandex/$YC_CONTAINER_REGISTRY/id-backend:$VERSION .
+          docker push cr.yandex/$YC_CONTAINER_REGISTRY/id-backend:$VERSION
 
       - name: Deploy COI VM
         id: deploy-coi
@@ -36,7 +42,7 @@ jobs:
         env:
           YC_SSH_LOGIN: ${{ secrets.YC_SSH_LOGIN }}
           YC_SSH_PUBLIC_KEY: ${{ secrets.YC_SSH_PUBLIC_KEY }}
-          IMAGE: cr.yandex/${{ env.YC_CONTAINER_REGISTRY }}/id-backend:${{ github.sha }}
+          IMAGE: cr.yandex/${{ env.YC_CONTAINER_REGISTRY }}/id-backend:${{ env.VERSION }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           BASE_DOMAIN: ${{ secrets.BASE_DOMAIN }}
           ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS }}
@@ -66,3 +72,18 @@ jobs:
           vm-security-group-ids: ${{ env.YC_SEC_GROUP_IDS }}
           docker-compose-path: "./docker-compose.yml"
           user-data-path: "./user-data.yaml"
+
+      - name: Create Git Tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag -a "v${{ env.VERSION }}" -m "Release v${{ env.VERSION }}"
+          git push origin "v${{ env.VERSION }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: v${{ env.VERSION }}
+          draft: false
+          prerelease: false
