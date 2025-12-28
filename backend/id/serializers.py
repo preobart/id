@@ -17,6 +17,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(write_only=True)
     first_name = serializers.CharField(required=True)
     last_name = serializers.CharField(required=True)
+    token = serializers.CharField(required=True, write_only=True)
     email = serializers.EmailField(
         required=True,
         validators=[
@@ -28,7 +29,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("first_name", "last_name", "email", "password", "password2")
+        fields = ("first_name", "last_name", "email", "password", "password2", "token")
 
     def validate(self, data):
         errors = {}

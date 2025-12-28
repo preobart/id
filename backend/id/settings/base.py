@@ -282,6 +282,14 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
 
+# Yandex SmartCaptcha settings
+SMARTCAPTCHA_SERVER_KEY = os.getenv("SMARTCAPTCHA_SERVER_KEY", "")
+SMARTCAPTCHA_VERIFY_URL = "https://smartcaptcha.cloud.yandex.ru/validate"
+
+# Logging and security settings
+MAX_BODY_BYTES = 10 * 1024
+SENSITIVE_KEYWORDS = ("pass", "token", "secret", "auth", "key", "refresh", "access")
+
 # Celery
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"

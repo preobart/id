@@ -19,6 +19,7 @@ from .serializers import (
     UserRegistrationSerializer,
     UserSerializer,
 )
+from .utils import check_smartcaptcha
 
 
 User = get_user_model()
@@ -35,10 +36,19 @@ def csrf_view(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def register_view(request):
+    token = request.data.get("token")
+    remote_ip = request.META.get("REMOTE_ADDR")
+
+    if not check_smartcaptcha(token, remote_ip):
+        return Response(
+            {"token": ["Invalid or missing captcha"]},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     serializer = UserRegistrationSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
-        login(request, user) 
+        login(request, user)
         return Response(
             {"user": UserSerializer(user).data},
             status=status.HTTP_201_CREATED,
