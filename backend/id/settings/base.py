@@ -284,7 +284,9 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
 
 # Yandex SmartCaptcha settings
 SMARTCAPTCHA_SERVER_KEY = os.getenv("SMARTCAPTCHA_SERVER_KEY", "")
-SMARTCAPTCHA_VERIFY_URL = "https://smartcaptcha.cloud.yandex.ru/validate"
+SMARTCAPTCHA_VERIFY_URL = os.getenv(
+    "SMARTCAPTCHA_VERIFY_URL", "https://smartcaptcha.cloud.yandex.ru/validate"
+)
 
 # Logging and security settings
 MAX_BODY_BYTES = 10 * 1024
