@@ -4,7 +4,6 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.permissions import IsAdminUser
 
-from . import admin as id_admin  # noqa: F401
 from . import views
 
 
@@ -41,3 +40,4 @@ urlpatterns = [
         ),
     ),
 ]
+
