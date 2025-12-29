@@ -1,11 +1,7 @@
-﻿import json
-import os
 from datetime import date, datetime
 from decimal import Decimal
 
 from django.conf import settings
-
-import requests
 
 
 def _is_sensitive_key(key):
@@ -13,6 +9,7 @@ def _is_sensitive_key(key):
         return False
     lower = key.lower()
     return any(substr in lower for substr in settings.SENSITIVE_KEYWORDS)
+
 
 def _safe_repr(value, max_len=200):
     try:
@@ -28,6 +25,7 @@ def _safe_repr(value, max_len=200):
         return s if len(s) <= max_len else s[:max_len] + "…"
     except (TypeError, ValueError):
         return "<unserializable>"
+
 
 def mask_sensitive(data, _depth=0, _max_depth=10, _seen=None):
     if _seen is None:
@@ -51,29 +49,3 @@ def mask_sensitive(data, _depth=0, _max_depth=10, _seen=None):
         return [mask_sensitive(i, _depth=_depth + 1, _max_depth=_max_depth, _seen=_seen) for i in data]
     return _safe_repr(data)
 
-def check_smartcaptcha(token, remote_ip=None):
-    server_key = settings.SMARTCAPTCHA_SERVER_KEY
-    if not server_key:
-        return True
-
-    if not token:
-        return False
-
-    data = {
-        "secret": server_key,
-        "token": token,
-    }
-    if remote_ip:
-        data["ip"] = remote_ip
-
-    try:
-        response = requests.post(settings.SMARTCAPTCHA_VERIFY_URL, data=data, timeout=1)
-        server_output = response.content.decode()
-
-        if response.status_code != 200:
-            return False
-
-        result = json.loads(server_output)
-        return result.get("status") == "ok"
-    except (requests.RequestException, ValueError, KeyError, json.JSONDecodeError):
-        return False

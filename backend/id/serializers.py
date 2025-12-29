@@ -8,6 +8,8 @@ from django.utils.http import urlsafe_base64_decode
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
+from .utils import is_email_verified
+
 
 User = get_user_model()
 
@@ -40,6 +42,9 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             validate_password(data["password"])
         except DjangoValidationError as e:
             errors["password"] = errors.get("password", []) + e.messages
+
+        if not is_email_verified(data["email"]):
+            errors["email"] = ["Email must be verified before registration"]
 
         if errors:
             raise serializers.ValidationError(errors)
@@ -103,3 +108,22 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         user.set_password(self.validated_data["password"])
         user.save()
         return user
+
+
+class EmailVerificationRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+
+    def validate_email(self, email):
+        if User.objects.filter(email=email).exists():
+            raise serializers.ValidationError(["User with this email already exists"])
+        return email
+
+
+class EmailVerificationConfirmSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    code = serializers.CharField(required=True, min_length=6, max_length=6)
+
+    def validate_code(self, code):
+        if not code.isdigit():
+            raise serializers.ValidationError(["Code must contain only digits"])
+        return code

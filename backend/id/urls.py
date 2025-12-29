@@ -34,8 +34,16 @@ urlpatterns = [
                     views.password_reset_confirm_view,
                     name="password-reset-confirm",
                 ),
-                path("", include("djoser.urls.jwt")),
-                path("", include("djoser.urls")),
+                path(
+                    "verify-email/request",
+                    views.email_verification_request_view,
+                    name="verify-email-request",
+                ),
+                path(
+                    "verify-email/confirm",
+                    views.email_verification_confirm_view,
+                    name="verify-email-confirm",
+                ),
             ]
         ),
     ),

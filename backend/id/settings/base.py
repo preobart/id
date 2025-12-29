@@ -59,6 +59,8 @@ INSTALLED_APPS = [
     "djoser",
     "django_celery_beat",
     "defender",
+    "django_otp",
+    "django_otp.plugins.otp_static",
 ]
 
 MIDDLEWARE = [
@@ -138,7 +140,11 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ),
-    "DEFAULT_THROTTLE_RATES": {"anon": "60/min", "user": "100/min"},
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "60/min",
+        "user": "100/min",
+        "email_verification": "3/min",
+    },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
@@ -182,11 +188,17 @@ CACHES = {
         "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
         "TIMEOUT": 60 * 60 * 24 * 7,
     },
-     "defender": {
+    "defender": {
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": env("DEFENDER_REDIS_URL", "redis://127.0.0.1:6379/1"),
         "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
         "TIMEOUT": 60 * 60 * 24,
+    },
+    "email_verification": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": env("EMAIL_VERIFICATION_REDIS_URL", "redis://127.0.0.1:6379/2"),
+        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+        "TIMEOUT": 15 * 60,
     },
 }
 
@@ -225,6 +237,8 @@ DJOSER = {
     "SERIALIZERS": {},
     "JWT_AUTH_COOKIE": "jwt",
 }
+
+OTP_TOTP_ISSUER = "ID Service"
 
 # Internationalization
 LANGUAGE_CODE = "en-us"

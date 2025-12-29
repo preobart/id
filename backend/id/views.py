@@ -9,17 +9,26 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 
 from defender import utils
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 
 from .serializers import (
+    EmailVerificationConfirmSerializer,
+    EmailVerificationRequestSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetSerializer,
     UserRegistrationSerializer,
     UserSerializer,
 )
-from .utils import check_smartcaptcha
+from .utils import (
+    check_smartcaptcha,
+    clear_verification,
+    generate_and_store_code,
+    mark_email_verified,
+    verify_code,
+)
 
 
 User = get_user_model()
@@ -48,6 +57,8 @@ def register_view(request):
     serializer = UserRegistrationSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
+        email = serializer.validated_data["email"]
+        clear_verification(email)
         login(request, user)
         return Response(
             {"user": UserSerializer(user).data},
@@ -128,5 +139,59 @@ def password_reset_confirm_view(request):
         serializer.save()
         return Response(
             {"detail": ("Password has been reset successfully")}, status=status.HTTP_200_OK
+        )
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class EmailVerificationThrottle(AnonRateThrottle):
+    scope = "email_verification"
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+@throttle_classes([EmailVerificationThrottle])
+def email_verification_request_view(request):
+    serializer = EmailVerificationRequestSerializer(data=request.data)
+    if serializer.is_valid():
+        email = serializer.validated_data["email"]
+        code = generate_and_store_code(email)
+        try:
+            send_mail(
+                subject="Email Verification Code",
+                message=f"Your verification code is: {code}",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[email],
+                fail_silently=False,
+            )
+        except Exception:
+            return Response(
+                {"detail": "Failed to send verification email. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response(
+            {"detail": "Verification code has been sent to your email"},
+            status=status.HTTP_200_OK,
+        )
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def email_verification_confirm_view(request):
+    serializer = EmailVerificationConfirmSerializer(data=request.data)
+    if serializer.is_valid():
+        email = serializer.validated_data["email"]
+        code = serializer.validated_data["code"]
+
+        if verify_code(email, code):
+            mark_email_verified(email)
+            return Response(
+                {"verified": True, "detail": "Email verified successfully"},
+                status=status.HTTP_200_OK,
+            )
+        return Response(
+            {"code": ["Invalid or expired verification code"]},
+            status=status.HTTP_400_BAD_REQUEST,
         )
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

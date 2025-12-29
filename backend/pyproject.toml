@@ -13,6 +13,7 @@ dependencies = [
     "django-cors-headers>=4.7.0",
     "django-defender>=0.9.8",
     "django-extensions>=4.1",
+    "django-otp>=1.3.0",
     "django-permissions-policy>=4.26.0",
     "django-redis>=6.0.0",
     "djangorestframework>=3.16.0",
