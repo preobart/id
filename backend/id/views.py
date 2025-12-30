@@ -14,6 +14,7 @@ from rest_framework.decorators import api_view, permission_classes, throttle_cla
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
+from waffle import flag_is_active
 
 from .serializers import (
     EmailVerificationConfirmSerializer,
@@ -168,14 +169,15 @@ class EmailVerificationThrottle(AnonRateThrottle):
 @permission_classes([AllowAny])
 @throttle_classes([EmailVerificationThrottle])
 def email_verification_request_view(request):
-    token = request.data.get("token")
-    remote_ip = request.META.get("REMOTE_ADDR")
+    if flag_is_active(request, "email_verification_captcha"):
+        token = request.data.get("token")
+        remote_ip = request.META.get("REMOTE_ADDR")
 
-    if not check_smartcaptcha(token, remote_ip):
-        return Response(
-            {"token": ["Invalid or missing captcha"]},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+        if not check_smartcaptcha(token, remote_ip):
+            return Response(
+                {"token": ["Invalid or missing captcha"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         
     serializer = EmailVerificationRequestSerializer(data=request.data)
     if serializer.is_valid():

@@ -47,5 +47,6 @@ urlpatterns = [
             ]
         ),
     ),
+    path("", include("waffle.urls")),
 ]
 

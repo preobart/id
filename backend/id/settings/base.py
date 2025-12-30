@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "defender",
     "django_otp",
     "django_otp.plugins.otp_static",
+    "waffle",
 ]
 
 MIDDLEWARE = [
@@ -70,6 +71,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "waffle.middleware.WaffleMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "id.middleware.LoggingMiddleware",

@@ -13,7 +13,6 @@ from .utils import is_email_verified
 
 User = get_user_model()
 
-
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     password2 = serializers.CharField(write_only=True)
@@ -115,7 +114,7 @@ class LoginSerializer(serializers.Serializer):
 
 class EmailVerificationRequestSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
-    token = serializers.CharField(required=True, write_only=True)
+    token = serializers.CharField(required=False, write_only=True, allow_blank=True)
 
     def validate_email(self, email):
         if User.objects.filter(email=email).exists():
