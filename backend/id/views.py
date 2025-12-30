@@ -8,6 +8,7 @@ from django.utils.http import urlsafe_base64_encode
 from django.views.decorators.csrf import ensure_csrf_cookie
 
 from defender import utils
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny
@@ -17,6 +18,7 @@ from rest_framework.throttling import AnonRateThrottle
 from .serializers import (
     EmailVerificationConfirmSerializer,
     EmailVerificationRequestSerializer,
+    LoginSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetSerializer,
     UserRegistrationSerializer,
@@ -42,6 +44,10 @@ def csrf_view(request):
     }, status=status.HTTP_200_OK)
 
 
+@extend_schema(
+    request=UserRegistrationSerializer,
+    responses={201: UserSerializer, 400: {"description": "Validation error"}},
+)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def register_view(request):
@@ -67,11 +73,19 @@ def register_view(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    request=LoginSerializer,
+    responses={200: UserSerializer, 401: {"description": "Invalid credentials"}, 403: {"description": "Account locked"}},
+)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def login_view(request):
-    email = request.data.get("email")
-    password = request.data.get("password")
+    serializer = LoginSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    email = serializer.validated_data["email"]
+    password = serializer.validated_data["password"]
     failure_limit = getattr(settings, "DEFENDER_LOGIN_FAILURE_LIMIT", 2)
     cooloff_time = utils.get_lockout_cooloff_time(ip_address=utils.get_ip(request), username=email)
     lockout_detail = (
@@ -106,6 +120,10 @@ def userinfo_view(request):
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+@extend_schema(
+    request=PasswordResetSerializer,
+    responses={200: {"description": "Password reset email sent"}, 400: {"description": "Validation error"}},
+)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def password_reset_view(request):
@@ -131,6 +149,10 @@ def password_reset_view(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    request=PasswordResetConfirmSerializer,
+    responses={200: {"description": "Password reset successfully"}, 400: {"description": "Validation error"}},
+)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def password_reset_confirm_view(request):
@@ -147,6 +169,10 @@ class EmailVerificationThrottle(AnonRateThrottle):
     scope = "email_verification"
 
 
+@extend_schema(
+    request=EmailVerificationRequestSerializer,
+    responses={200: {"description": "Verification code sent"}},
+)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @throttle_classes([EmailVerificationThrottle])
@@ -176,6 +202,10 @@ def email_verification_request_view(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    request=EmailVerificationConfirmSerializer,
+    responses={200: {"description": "Email verified successfully"}},
+)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def email_verification_confirm_view(request):

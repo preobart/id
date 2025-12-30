@@ -7,9 +7,8 @@ class RedisStaticDevice:
     def __init__(self, email):
         self.email = email
         self.cache = caches["email_verification"]
-        self.key_prefix = f"otp_device:{email}"
-        self.code_key = f"{self.key_prefix}:code"
-        self.attempts_key = f"{self.key_prefix}:attempts"
+        self.code_key = f"{email}:code"
+        self.attempts_key = f"{email}:attempts"
         self.verified_key = f"email_verified:{email}"
 
     def generate_token(self, length=6):
