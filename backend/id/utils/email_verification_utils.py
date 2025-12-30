@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 
-from ..otp_backends import RedisStaticDevice
+from ..backends import RedisStaticDevice
 
 
 User = get_user_model()

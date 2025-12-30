@@ -19,7 +19,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(write_only=True)
     first_name = serializers.CharField(required=True)
     last_name = serializers.CharField(required=True)
-    token = serializers.CharField(required=True, write_only=True)
     email = serializers.EmailField(
         required=True,
         validators=[
@@ -31,7 +30,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("first_name", "last_name", "email", "password", "password2", "token")
+        fields = ("first_name", "last_name", "email", "password", "password2")
 
     def validate(self, data):
         errors = {}
@@ -53,7 +52,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop("password2")
-        validated_data.pop("token")
         validated_data["username"] = validated_data["email"]
         user = User.objects.create_user(**validated_data)
         return user
@@ -117,6 +115,7 @@ class LoginSerializer(serializers.Serializer):
 
 class EmailVerificationRequestSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
+    token = serializers.CharField(required=True, write_only=True)
 
     def validate_email(self, email):
         if User.objects.filter(email=email).exists():

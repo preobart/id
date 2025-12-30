@@ -51,15 +51,6 @@ def csrf_view(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def register_view(request):
-    token = request.data.get("token")
-    remote_ip = request.META.get("REMOTE_ADDR")
-
-    if not check_smartcaptcha(token, remote_ip):
-        return Response(
-            {"token": ["Invalid or missing captcha"]},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
     serializer = UserRegistrationSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
@@ -177,6 +168,15 @@ class EmailVerificationThrottle(AnonRateThrottle):
 @permission_classes([AllowAny])
 @throttle_classes([EmailVerificationThrottle])
 def email_verification_request_view(request):
+    token = request.data.get("token")
+    remote_ip = request.META.get("REMOTE_ADDR")
+
+    if not check_smartcaptcha(token, remote_ip):
+        return Response(
+            {"token": ["Invalid or missing captcha"]},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+        
     serializer = EmailVerificationRequestSerializer(data=request.data)
     if serializer.is_valid():
         email = serializer.validated_data["email"]
