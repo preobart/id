@@ -19,6 +19,7 @@ urlpatterns = [
         SpectacularSwaggerView.as_view(url_name="schema", permission_classes=[IsAdminUser]),
         name="swagger-ui",
     ),
+    path("feature-flags", views.feature_flags_view, name="feature-flags"),
     path(
         "auth/",
         include(
@@ -47,6 +48,5 @@ urlpatterns = [
             ]
         ),
     ),
-    path("", include("waffle.urls")),
 ]
 

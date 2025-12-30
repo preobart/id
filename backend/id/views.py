@@ -15,6 +15,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from waffle import flag_is_active
+from waffle.models import Flag
 
 from .serializers import (
     EmailVerificationConfirmSerializer,
@@ -227,3 +228,21 @@ def email_verification_confirm_view(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema(
+    responses={200: {"type": "object", "properties": {"flags": {"type": "array", "items": {"type": "string"}}}}},
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def feature_flags_view(request):
+    active_flags = []
+    flags = Flag.objects.filter(
+        category__target__in=["frontend", "both"]
+    ).select_related("category")
+    
+    for flag in flags:
+        if flag_is_active(request, flag.name):
+            active_flags.append(flag.name)
+    
+    return Response({"flags": active_flags}, status=status.HTTP_200_OK)
