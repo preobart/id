@@ -112,16 +112,6 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(required=True, write_only=True)
 
 
-class EmailVerificationRequestSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
-    token = serializers.CharField(required=False, write_only=True, allow_blank=True)
-
-    def validate_email(self, email):
-        if User.objects.filter(email=email).exists():
-            raise serializers.ValidationError(["User with this email already exists"])
-        return email
-
-
 class EmailVerificationConfirmSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
     code = serializers.CharField(required=True, min_length=6, max_length=6)
@@ -130,3 +120,8 @@ class EmailVerificationConfirmSerializer(serializers.Serializer):
         if not code.isdigit():
             raise serializers.ValidationError(["Code must contain only digits"])
         return code
+
+
+class CheckEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    token = serializers.CharField(required=False, write_only=True, allow_blank=True)

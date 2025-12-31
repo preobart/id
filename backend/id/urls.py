@@ -36,14 +36,14 @@ urlpatterns = [
                     name="password-reset-confirm",
                 ),
                 path(
-                    "verify-email/request",
-                    views.email_verification_request_view,
-                    name="verify-email-request",
+                    "verify-email",
+                    views.verify_email_view,
+                    name="verify-email",
                 ),
                 path(
-                    "verify-email/confirm",
-                    views.email_verification_confirm_view,
-                    name="verify-email-confirm",
+                    "check-email",
+                    views.check_email_view,
+                    name="check-email",
                 ),
             ]
         ),

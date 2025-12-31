@@ -18,8 +18,8 @@ from waffle import flag_is_active
 from waffle.models import Flag
 
 from .serializers import (
+    CheckEmailSerializer,
     EmailVerificationConfirmSerializer,
-    EmailVerificationRequestSerializer,
     LoginSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetSerializer,
@@ -163,55 +163,12 @@ class EmailVerificationThrottle(AnonRateThrottle):
 
 
 @extend_schema(
-    request=EmailVerificationRequestSerializer,
-    responses={200: {"description": "Verification code sent"}},
-)
-@api_view(["POST"])
-@permission_classes([AllowAny])
-@throttle_classes([EmailVerificationThrottle])
-def email_verification_request_view(request):
-    if flag_is_active(request, "email_verification_captcha"):
-        token = request.data.get("token")
-        remote_ip = request.META.get("REMOTE_ADDR")
-
-        if not check_smartcaptcha(token, remote_ip):
-            return Response(
-                {"token": ["Invalid or missing captcha"]},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        
-    serializer = EmailVerificationRequestSerializer(data=request.data)
-    if serializer.is_valid():
-        email = serializer.validated_data["email"]
-        code = generate_and_store_code(email)
-        try:
-            send_mail(
-                subject="Email Verification Code",
-                message=f"Your verification code is: {code}",
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[email],
-                fail_silently=False,
-            )
-        except Exception:
-            return Response(
-                {"detail": "Failed to send verification email. Please try again later."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-        return Response(
-            {"detail": "Verification code has been sent to your email"},
-            status=status.HTTP_200_OK,
-        )
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-@extend_schema(
     request=EmailVerificationConfirmSerializer,
     responses={200: {"description": "Email verified successfully"}},
 )
 @api_view(["POST"])
 @permission_classes([AllowAny])
-def email_verification_confirm_view(request):
+def verify_email_view(request):
     serializer = EmailVerificationConfirmSerializer(data=request.data)
     if serializer.is_valid():
         email = serializer.validated_data["email"]
@@ -228,6 +185,66 @@ def email_verification_confirm_view(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema(
+    request=CheckEmailSerializer,
+    responses={
+        200: {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "enum": ["login", "register"]},
+                "detail": {"type": "string"},
+            },
+        },
+    },
+)
+@api_view(["POST"])
+@permission_classes([AllowAny])
+@throttle_classes([EmailVerificationThrottle])
+def check_email_view(request):
+    serializer = CheckEmailSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    email = serializer.validated_data["email"]
+    user_exists = User.objects.filter(email=email).exists()
+    
+    if user_exists:
+        return Response(
+            {"action": "login"},
+            status=status.HTTP_200_OK,
+        )
+    
+    if flag_is_active(request, "email_verification_captcha"):
+        token = request.data.get("token")
+        remote_ip = request.META.get("REMOTE_ADDR")
+
+        if not check_smartcaptcha(token, remote_ip):
+            return Response(
+                {"token": ["Invalid or missing captcha"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    
+    code = generate_and_store_code(email)
+    try:
+        send_mail(
+            subject="Email Verification Code",
+            message=f"Your verification code is: {code}",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=False,
+        )
+    except Exception:
+        return Response(
+            {"detail": "Failed to send verification email. Please try again later."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+    
+    return Response(
+        {"action": "register", "detail": "Verification code has been sent to your email"},
+        status=status.HTTP_200_OK,
+    )
 
 
 @extend_schema(
