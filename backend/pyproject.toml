@@ -111,8 +111,8 @@ ignore = [
   "COM819",
   "ISC001",
   "ISC002",
-  # Disable unused `noqa` directive
   "RUF100",
+  "RUF012",
 ]
 # Allow unused variables when underscore-prefixed:
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
@@ -137,3 +137,7 @@ lines-after-imports = 2
 "**/*test*.py" = ["E402", "F403", "F405", "S", "N802"]
 "**/{settings}/*" = ["E402", "F403", "F405"]
 "**/migrations/*" = ["RUF", "I"]
+
+[tool.pyright]
+reportMissingImports = false
+reportMissingTypeStubs = false

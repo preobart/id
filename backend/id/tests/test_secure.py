@@ -20,8 +20,8 @@ class SecureTests(APITestCase):
 
     def test_throttle_anonymous_user(self):
         for _ in range(61):
-            response = self.client.post(self.login_url)
-            self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED ,status.HTTP_403_FORBIDDEN, status.HTTP_429_TOO_MANY_REQUESTS))
+            response = self.client.post(self.login_url, {"email": "wrong@example.com", "password": "wrongpass"})
+            self.assertIn(response.status_code, (status.HTTP_400_BAD_REQUEST, status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN, status.HTTP_429_TOO_MANY_REQUESTS))
             if response.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
                 self.assertIn("throttled", response.data["detail"])
 

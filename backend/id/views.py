@@ -239,6 +239,7 @@ class CheckEmailView(APIView):
 
 
 @api_view(["POST"])
+@permission_classes([AllowAny])
 def logout_view(request):
     logout(request)
     return Response({"detail": "Logged out"})

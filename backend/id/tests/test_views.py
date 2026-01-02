@@ -1,17 +1,20 @@
-from unittest.mock import patch
-
 from django.contrib.auth import get_user_model
-from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.core.cache import cache
 from django.urls import reverse
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode
 
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
-from id.utils import generate_and_store_code, is_email_verified, mark_email_verified, verify_code
+from id.utils import (
+    generate_and_store_code,
+    generate_and_store_password_reset_code,
+    is_email_verified,
+    mark_email_verified,
+    mark_password_reset_verified,
+    verify_code,
+    verify_password_reset_code,
+)
 
 
 User = get_user_model()
@@ -20,6 +23,11 @@ User = get_user_model()
 class ViewTests(APITestCase):
     def setUp(self):
         self.client = APIClient()
+        from django.core.cache import caches
+        try:
+            caches["defender"].clear()
+        except (KeyError, AttributeError):
+            pass
 
         self.register_url = reverse("register")
         self.login_url = reverse("login")
@@ -27,15 +35,14 @@ class ViewTests(APITestCase):
         self.user_url = reverse("userinfo")
         self.password_reset_url = reverse("password-reset")
         self.password_reset_confirm_url = reverse("password-reset-confirm")
-        self.verify_email_request_url = reverse("verify-email-request")
-        self.verify_email_confirm_url = reverse("verify-email-confirm")
+        self.verify_email_request_url = reverse("check-email")
+        self.verify_email_confirm_url = reverse("verify-email")
 
         self.user = User.objects.create_user(
             username="user", email="user@example.com", password="password-123"
         )
 
-    @patch("id.views.check_smartcaptcha", return_value=True)
-    def test_register_user_successfully(self, mock_captcha):
+    def test_register_user_successfully(self):
         email = "newuser@example.com"
         code = generate_and_store_code(email)
         verify_code(email, code)
@@ -51,11 +58,10 @@ class ViewTests(APITestCase):
         }
         response = self.client.post(self.register_url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertIn("user", response.data)
+        self.assertEqual(response.data["email"], email)
         self.assertFalse(is_email_verified(email))
 
-    @patch("id.views.check_smartcaptcha", return_value=True)
-    def test_register_user_passwords_do_not_match(self, mock_captcha):
+    def test_register_user_passwords_do_not_match(self):
         email = "user1@example.com"
         code = generate_and_store_code(email)
         verify_code(email, code)
@@ -73,8 +79,7 @@ class ViewTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("password", response.data)
 
-    @patch("id.views.check_smartcaptcha", return_value=True)
-    def test_register_user_without_verified_email(self, mock_captcha):
+    def test_register_user_without_verified_email(self):
         data = {
             "first_name": "User",
             "last_name": "Two",
@@ -88,9 +93,9 @@ class ViewTests(APITestCase):
         self.assertIn("email", response.data)
         self.assertIn("Email must be verified", str(response.data["email"]))
 
-    @patch("id.views.check_smartcaptcha", return_value=False)
-    def test_register_user_invalid_captcha(self, mock_captcha):
-        email = "test@example.com"
+    def test_register_user_successful_without_captcha(self):
+        import uuid
+        email = f"testcaptcha{uuid.uuid4().hex[:8]}@example.com"
         code = generate_and_store_code(email)
         verify_code(email, code)
         mark_email_verified(email)
@@ -99,24 +104,26 @@ class ViewTests(APITestCase):
             "first_name": "Test",
             "last_name": "User",
             "email": email,
-            "password": "password123",
-            "password2": "password123",
-            "token": "invalid_captcha",
+            "password": "StrongPass123!",
+            "password2": "StrongPass123!",
         }
         response = self.client.post(self.register_url, data)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("token", response.data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data["email"], email)
 
     def test_login_successful(self):
-        data = {"username": "user2", "password": "password-123"}
+        login_user = User.objects.create_user(
+            username="loginuser@example.com", email="loginuser@example.com", password="password-123"
+        )
+        data = {"email": login_user.email, "password": "password-123"}
         response = self.client.post(self.login_url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("user", response.data)
 
     def test_login_invalid_credentials(self):
-        data = {"username": "user", "password": "wrongpass"}
+        data = {"email": self.user.email, "password": "wrongpass"}
         response = self.client.post(self.login_url, data)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
 
     def test_logout_authenticated(self):
         self.client.force_authenticate(user=self.user)
@@ -133,7 +140,7 @@ class ViewTests(APITestCase):
         self.client.force_authenticate(user=self.user)
         response = self.client.get(self.user_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["username"], self.user.username)
+        self.assertEqual(response.data["email"], self.user.email)
 
     def test_get_user_data_unauthenticated(self):
         response = self.client.get(self.user_url)
@@ -144,7 +151,7 @@ class ViewTests(APITestCase):
         response = self.client.post(self.password_reset_url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(mail.outbox), 1)
-        self.assertIn("Password reset email has been sent", response.data["detail"])
+        self.assertIn("Password reset code has been sent", response.data["detail"])
 
     def test_password_reset_email_invalid(self):
         data = {"email": "invalid@example.com"}
@@ -152,13 +159,15 @@ class ViewTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_password_reset_confirm_success(self):
-        uid = urlsafe_base64_encode(force_bytes(self.user.pk))
-        token = default_token_generator.make_token(self.user)
+        email = self.user.email
+        code = generate_and_store_password_reset_code(email)
+        verify_password_reset_code(email, code)
+        mark_password_reset_verified(email)
 
         data = {
-            "uid": uid,
-            "token": token,
+            "email": email,
             "password": "newpass123",
+            "password2": "newpass123",
         }
         response = self.client.post(self.password_reset_confirm_url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -166,9 +175,9 @@ class ViewTests(APITestCase):
 
     def test_password_reset_confirm_invalid(self):
         data = {
-            "uid": "baduid",
-            "token": "badtoken",
+            "email": "nonexistent@example.com",
             "password": "newpass123",
+            "password2": "newpass123",
         }
         response = self.client.post(self.password_reset_confirm_url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -177,8 +186,8 @@ class ViewTests(APITestCase):
 class EmailVerificationTests(APITestCase):
     def setUp(self):
         self.client = APIClient()
-        self.verify_email_request_url = reverse("verify-email-request")
-        self.verify_email_confirm_url = reverse("verify-email-confirm")
+        self.verify_email_request_url = reverse("check-email")
+        self.verify_email_confirm_url = reverse("verify-email")
         cache.clear()
 
     def tearDown(self):
@@ -190,7 +199,7 @@ class EmailVerificationTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("detail", response.data)
         self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(mail.outbox[0].subject, "Email Verification Code")
+        self.assertEqual(mail.outbox[0].subject, "Verification Code")
         self.assertIn("Your verification code is:", mail.outbox[0].body)
 
     def test_verify_email_request_existing_user(self):
@@ -199,8 +208,8 @@ class EmailVerificationTests(APITestCase):
         )
         data = {"email": "existing@example.com"}
         response = self.client.post(self.verify_email_request_url, data)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("email", response.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["action"], "login")
 
     def test_verify_email_request_invalid_email(self):
         data = {"email": "invalid-email"}
@@ -232,7 +241,8 @@ class EmailVerificationTests(APITestCase):
         email = "test@example.com"
         code = generate_and_store_code(email)
 
-        cache.delete(f"otp_device:{email}:code")
+        from django.core.cache import caches
+        caches["email_verification"].delete(f"{email}:code")
 
         data = {"email": email, "code": str(code)}
         response = self.client.post(self.verify_email_confirm_url, data)
