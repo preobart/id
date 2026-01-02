@@ -4,7 +4,6 @@ from django.middleware.csrf import get_token
 from django.views.decorators.csrf import ensure_csrf_cookie
 
 from defender import utils
-from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -14,6 +13,7 @@ from rest_framework.views import APIView
 from waffle import flag_is_active
 from waffle.models import Flag
 
+from .errors import CaptchaValidationError, EmailSendError
 from .serializers import (
     CheckEmailSerializer,
     EmailVerificationConfirmSerializer,
@@ -32,7 +32,8 @@ from .utils import (
     is_password_reset_verified,
     mark_email_verified,
     mark_password_reset_verified,
-    send_code_with_captcha_check,
+    send_verification_code,
+    validate_captcha,
     verify_code,
     verify_password_reset_code,
 )
@@ -104,19 +105,24 @@ class PasswordResetView(APIView):
 
         email = serializer.validated_data["email"]
 
-        result = send_code_with_captcha_check(
-            request, email, generate_and_store_password_reset_code
-        )
+        if flag_is_active(request, "email_verification_captcha"):
+            token = request.data.get("token")
+            remote_ip = request.META.get("REMOTE_ADDR")
+            try:
+                validate_captcha(token, remote_ip)
+            except CaptchaValidationError:
+                return Response(
+                    {"token": ["Invalid or missing captcha"]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        if not result["success"]:
-            error_type = result["error_type"]
-            error_data = result["error_data"]
-            status_code = (
-                status.HTTP_400_BAD_REQUEST
-                if error_type == "captcha"
-                else status.HTTP_500_INTERNAL_SERVER_ERROR
+        try:
+            send_verification_code(email, generate_and_store_password_reset_code)
+        except EmailSendError:
+            return Response(
+                {"detail": "Failed to send email. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-            return Response(error_data, status=status_code)
 
         return Response(
             {"detail": "Password reset code has been sent to your email"},
@@ -207,17 +213,24 @@ class CheckEmailView(APIView):
         if user_exists:
             return Response({"action": "login"}, status=status.HTTP_200_OK)
 
-        result = send_code_with_captcha_check(request, email, generate_and_store_code)
+        if flag_is_active(request, "email_verification_captcha"):
+            token = request.data.get("token")
+            remote_ip = request.META.get("REMOTE_ADDR")
+            try:
+                validate_captcha(token, remote_ip)
+            except CaptchaValidationError:
+                return Response(
+                    {"token": ["Invalid or missing captcha"]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        if not result["success"]:
-            error_type = result["error_type"]
-            error_data = result["error_data"]
-            status_code = (
-                status.HTTP_400_BAD_REQUEST
-                if error_type == "captcha"
-                else status.HTTP_500_INTERNAL_SERVER_ERROR
+        try:
+            send_verification_code(email, generate_and_store_code)
+        except EmailSendError:
+            return Response(
+                {"detail": "Failed to send email. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-            return Response(error_data, status=status_code)
 
         return Response(
             {"action": "register", "detail": "Verification code has been sent to your email"},
@@ -250,9 +263,7 @@ def feature_flags_view(request):
 @permission_classes([AllowAny])
 @ensure_csrf_cookie
 def csrf_view(request):
-    return Response({
-        "token": get_token(request)
-    }, status=status.HTTP_200_OK)
+    return Response({"token": get_token(request)}, status=status.HTTP_200_OK)
 
 
 @api_view(["GET"])
