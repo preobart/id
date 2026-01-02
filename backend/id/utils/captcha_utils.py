@@ -7,12 +7,6 @@ import requests
 
 def check_smartcaptcha(token, remote_ip=None):
     server_key = settings.SMARTCAPTCHA_SERVER_KEY
-    if not server_key:
-        return True
-
-    if not token:
-        return False
-
     data = {
         "secret": server_key,
         "token": token,

@@ -1,9 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
-from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.utils.encoding import force_str
-from django.utils.http import urlsafe_base64_decode
 
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
@@ -64,6 +61,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 class PasswordResetSerializer(serializers.Serializer):
     email = serializers.EmailField()
+    token = serializers.CharField(required=False, write_only=True, allow_blank=True)
 
     def validate_email(self, email):
         try:
@@ -73,32 +71,42 @@ class PasswordResetSerializer(serializers.Serializer):
         return email
 
 
-class PasswordResetConfirmSerializer(serializers.Serializer):
-    uid = serializers.CharField()
-    token = serializers.CharField()
-    password = serializers.CharField(write_only=True)
+class PasswordResetVerifySerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    code = serializers.CharField(required=True, min_length=6, max_length=6)
 
-    def validate(self, attrs):
+    def validate_code(self, code):
+        if not code.isdigit():
+            raise serializers.ValidationError(["Code must contain only digits"])
+        return code
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(write_only=True)
+    password2 = serializers.CharField(write_only=True)
+
+    def validate(self, data):
         errors = {}
         try:
-            uid = force_str(urlsafe_base64_decode(attrs["uid"]))
-            user = User.objects.get(pk=uid)
-        except (TypeError, ValueError, User.DoesNotExist) as e:
-            errors["non_field_errors"] = ["Invalid user identification"]
+            user = User.objects.get(email=data["email"])
+        except User.DoesNotExist as e:
+            errors["email"] = ["User with this email does not exist"]
             raise serializers.ValidationError(errors) from e
 
-        if not default_token_generator.check_token(user, attrs["token"]):
-            errors["non_field_errors"] = ["Invalid or expired token"]
-            raise serializers.ValidationError(errors)
+        if data["password"] != data["password2"]:
+            errors["password"] = ["Passwords do not match"]
 
         try:
-            validate_password(attrs["password"], user)
+            validate_password(data["password"], user)
         except DjangoValidationError as e:
-            errors["password"] = e.messages
-            raise serializers.ValidationError(errors) from e
+            errors["password"] = errors.get("password", []) + e.messages
 
-        attrs["user"] = user
-        return attrs
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        data["user"] = user
+        return data
 
     def save(self, **kwargs):
         user = self.validated_data["user"]

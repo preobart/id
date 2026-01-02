@@ -4,12 +4,12 @@ from django.core.cache import caches
 
 
 class RedisStaticDevice:
-    def __init__(self, email):
-        self.email = email
+    def __init__(self, identifier):
+        self.identifier = identifier
         self.cache = caches["email_verification"]
-        self.code_key = f"{email}:code"
-        self.attempts_key = f"{email}:attempts"
-        self.verified_key = f"email_verified:{email}"
+        self.code_key = f"{identifier}:code"
+        self.attempts_key = f"{identifier}:attempts"
+        self.verified_key = f"verified:{identifier}"
 
     def generate_token(self, length=6):
         base = 10 ** (length - 1)
