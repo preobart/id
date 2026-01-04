@@ -52,12 +52,9 @@ INSTALLED_APPS = [
     "django_extensions",
     "corsheaders",
     "rest_framework",
-    "rest_framework.authtoken",
     "drf_spectacular",
     "django_celery_beat",
     "defender",
-    "django_otp",
-    "django_otp.plugins.otp_static",
     "waffle",
     "id",
 ]
@@ -220,9 +217,6 @@ CACHES = {
 CORS_ALLOWED_ORIGINS = []
 CORS_ALLOW_CREDENTIALS = True
 
-
-OTP_TOTP_ISSUER = "ID Service"
-
 # Internationalization
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Europe/Moscow"
@@ -321,3 +315,6 @@ CELERY_EVENT_QUEUE_TTL = float(env("CELERY_EVENT_QUEUE_TTL", 5.0))
 LOGIN_REDIRECT_URL = '/'
 LOGIN_URL = '/login/'
 LOGOUT_REDIRECT_URL = '/'
+
+# Waffle settings
+WAFFLE_FLAG_MODEL = 'id.Flag'

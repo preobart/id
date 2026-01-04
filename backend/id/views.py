@@ -10,8 +10,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
-from waffle import flag_is_active
-from waffle.models import Flag
+from waffle import flag_is_active, get_waffle_flag_model
 
 from .errors import CaptchaValidationError, EmailSendError
 from .serializers import (
@@ -40,7 +39,7 @@ from .utils import (
 
 
 User = get_user_model()
-
+Flag = get_waffle_flag_model()
 
 class EmailVerificationThrottle(AnonRateThrottle):
     scope = "email_verification"
@@ -248,15 +247,8 @@ def logout_view(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def feature_flags_view(request):
-    active_flags = []
-    flags = Flag.objects.filter(
-        category__target__in=["frontend", "both"]
-    ).select_related("category")
-    
-    for flag in flags:
-        if flag_is_active(request, flag.name):
-            active_flags.append(flag.name)
-    
+    flags = Flag.objects.filter(target__in=["frontend", "both"])
+    active_flags = [flag.name for flag in flags if flag_is_active(request, flag.name)]
     return Response({"flags": active_flags}, status=status.HTTP_200_OK)
 
 
