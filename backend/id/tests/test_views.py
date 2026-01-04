@@ -25,7 +25,7 @@ class ViewTests(APITestCase):
         self.client = APIClient()
         from django.core.cache import caches
         try:
-            caches["defender"].clear()
+            caches["axes"].clear()
         except (KeyError, AttributeError):
             pass
 

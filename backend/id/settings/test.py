@@ -51,17 +51,11 @@ CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
     },
-    "defender": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": env("DEFENDER_REDIS_URL", "redis://127.0.0.1:6379/1"),
-        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+    "axes": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
     },
     "email_verification": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
     },
 }
-
-DEFENDER_REDIS_NAME = "defender"
-DEFENDER_LOGIN_FAILURE_LIMIT = 100
-DEFENDER_COOLOFF_TIME = 0
 

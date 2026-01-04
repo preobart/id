@@ -54,7 +54,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "drf_spectacular",
     "django_celery_beat",
-    "defender",
+    "axes",
     "waffle",
     "id",
 ]
@@ -69,6 +69,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "axes.middleware.AxesMiddleware",
     "waffle.middleware.WaffleMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -198,9 +199,9 @@ CACHES = {
         "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
         "TIMEOUT": 60 * 60 * 24 * 7,
     },
-     "defender": {
+    "axes": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": env("DEFENDER_REDIS_URL", "redis://127.0.0.1:6379/1"),
+        "LOCATION": env("AXES_REDIS_URL", env("DEFENDER_REDIS_URL", "redis://127.0.0.1:6379/1")),
         "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
         "TIMEOUT": 60 * 60 * 24,
     },
@@ -245,16 +246,15 @@ PERMISSIONS_POLICY = {
     "xr-spatial-tracking": [],
 }
 
-# Defender settings
-DEFENDER_REDIS_NAME = "defender"
-
-# Number of failed login attempts before a user is locked out.
-# django-defender checks the lock *after* recording a failed attempt,
-# so the actual lock happens 1 attempt later than this number.
-DEFENDER_LOGIN_FAILURE_LIMIT = 2
-DEFENDER_STORE_ACCESS_ATTEMPTS = False  # БД не используется
-DEFENDER_COOLOFF_TIME = 10
-DEFENDER_USE_CELERY = False
+# Axes settings
+AXES_ENABLED = True
+AXES_FAILURE_LIMIT = 3
+AXES_COOLOFF_TIME = 600
+AXES_LOCK_OUT_AT_FAILURE = True
+AXES_RESET_ON_SUCCESS = True
+AXES_HANDLER = "axes.handlers.cache.AxesCacheHandler"
+AXES_CACHE = "axes"
+AXES_DISABLE_ACCESS_LOG = False
 
 # Enables HTTPS with HSTS (including subdomains and preload), redirects HTTP to HTTPS,
 # and sets security headers to prevent MIME sniffing, XSS, and clickjacking.
