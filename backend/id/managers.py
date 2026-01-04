@@ -70,36 +70,32 @@ class LoginLockoutManager:
         self.lockout_key = f"locked:{email}:{ip_address}"
         self.lockout_count_key = f"count:{email}:{ip_address}"
 
-    def _get_lockout_time(self, lockout_count):
-        lockout_times = getattr(settings, "LOCKOUT_EXPONENTIAL_TIMES", [60, 120, 300, 600, 0])
-        index = min(lockout_count - 1, len(lockout_times) - 1)
-        lockout_time = lockout_times[index]
-        return lockout_time
-
     def is_locked(self):
         return self.cache.get(self.lockout_key, False)
 
     def get_lockout_time(self):
         lockout_count = self.cache.get(self.lockout_count_key, 1)
-        return self._get_lockout_time(lockout_count)
+        lockout_times = settings.LOCKOUT_EXPONENTIAL_TIMES
+        return lockout_times[lockout_count - 1]
 
     def record_failed(self):
-        failed_ttl = getattr(settings, "LOCKOUT_FAILED_ATTEMPTS_TTL", 3600)
+        failed_ttl = settings.LOCKOUT_FAILED_ATTEMPTS_TTL
         try:
             count = self.cache.incr(self.failed_key)
-            self.cache.expire(self.failed_key, failed_ttl)
+            self.cache.set(self.failed_key, count, timeout=failed_ttl)
         except ValueError:
             self.cache.set(self.failed_key, 1, timeout=failed_ttl)
             count = 1
 
-        failure_limit = getattr(settings, "LOCKOUT_FAILURE_LIMIT", 3)
+        failure_limit = settings.LOCKOUT_FAILURE_LIMIT
 
         if count >= failure_limit:
             old_lockout_count = self.cache.get(self.lockout_count_key, 0)
             lockout_count = old_lockout_count + 1
-            self.cache.set(self.lockout_count_key, lockout_count, timeout=getattr(settings, "LOCKOUT_COUNT_TTL", 86400))
+            self.cache.set(self.lockout_count_key, lockout_count, timeout=settings.LOCKOUT_COUNT_TTL)
 
-            lockout_time = self._get_lockout_time(lockout_count)
+            lockout_times = settings.LOCKOUT_EXPONENTIAL_TIMES
+            lockout_time = lockout_times[lockout_count - 1]
             timeout = lockout_time if lockout_time > 0 else None
             self.cache.set(self.lockout_key, True, timeout=timeout)
             self.cache.delete(self.failed_key)

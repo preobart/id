@@ -1,10 +1,12 @@
 from django.contrib.auth import get_user_model
 from django.core import mail
-from django.core.cache import cache
+from django.core.cache import cache, caches
 from django.urls import reverse
 
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
+
+from id.managers import EmailVerificationManager, LoginLockoutManager
 
 
 User = get_user_model()
@@ -13,7 +15,6 @@ User = get_user_model()
 class ViewTests(APITestCase):
     def setUp(self):
         self.client = APIClient()
-        from django.core.cache import caches
         try:
             caches["lockout"].clear()
         except (KeyError, AttributeError):
@@ -34,9 +35,10 @@ class ViewTests(APITestCase):
 
     def test_register_user_successfully(self):
         email = "newuser@example.com"
-        code = generate_and_store_code(email)
-        verify_code(email, code)
-        mark_email_verified(email)
+        manager = EmailVerificationManager(email, "")
+        code = manager.generate_and_store_code()
+        manager.verify_code(code)
+        manager.mark_verified()
 
         data = {
             "first_name": "New",
@@ -49,13 +51,14 @@ class ViewTests(APITestCase):
         response = self.client.post(self.register_url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["email"], email)
-        self.assertFalse(is_email_verified(email))
+        self.assertFalse(EmailVerificationManager(email, "").is_verified())
 
     def test_register_user_passwords_do_not_match(self):
         email = "user1@example.com"
-        code = generate_and_store_code(email)
-        verify_code(email, code)
-        mark_email_verified(email)
+        manager = EmailVerificationManager(email, "")
+        code = manager.generate_and_store_code()
+        manager.verify_code(code)
+        manager.mark_verified()
 
         data = {
             "first_name": "User",
@@ -86,9 +89,10 @@ class ViewTests(APITestCase):
     def test_register_user_successful_without_captcha(self):
         import uuid
         email = f"testcaptcha{uuid.uuid4().hex[:8]}@example.com"
-        code = generate_and_store_code(email)
-        verify_code(email, code)
-        mark_email_verified(email)
+        manager = EmailVerificationManager(email, "")
+        code = manager.generate_and_store_code()
+        manager.verify_code(code)
+        manager.mark_verified()
 
         data = {
             "first_name": "Test",
@@ -150,9 +154,10 @@ class ViewTests(APITestCase):
 
     def test_password_reset_confirm_success(self):
         email = self.user.email
-        code = generate_and_store_password_reset_code(email)
-        verify_password_reset_code(email, code)
-        mark_password_reset_verified(email)
+        manager = EmailVerificationManager(f"password_reset:{email}", "")
+        code = manager.generate_and_store_code()
+        manager.verify_code(code)
+        manager.mark_verified()
 
         data = {
             "email": email,
@@ -209,29 +214,31 @@ class EmailVerificationTests(APITestCase):
 
     def test_verify_email_confirm_success(self):
         email = "test@example.com"
-        code = generate_and_store_code(email)
+        manager = EmailVerificationManager(email, "")
+        code = manager.generate_and_store_code()
 
         data = {"email": email, "code": str(code)}
         response = self.client.post(self.verify_email_confirm_url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["verified"])
-        self.assertTrue(is_email_verified(email))
+        self.assertTrue(EmailVerificationManager(email, "").is_verified())
 
     def test_verify_email_confirm_invalid_code(self):
         email = "test@example.com"
-        generate_and_store_code(email)
+        manager = EmailVerificationManager(email, "")
+        manager.generate_and_store_code()
 
         data = {"email": email, "code": "000000"}
         response = self.client.post(self.verify_email_confirm_url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("code", response.data)
-        self.assertFalse(is_email_verified(email))
+        self.assertFalse(EmailVerificationManager(email, "").is_verified())
 
     def test_verify_email_confirm_expired_code(self):
         email = "test@example.com"
-        code = generate_and_store_code(email)
+        manager = EmailVerificationManager(email, "")
+        code = manager.generate_and_store_code()
 
-        from django.core.cache import caches
         caches["email_verification"].delete(f"{email}:code")
 
         data = {"email": email, "code": str(code)}
@@ -241,7 +248,8 @@ class EmailVerificationTests(APITestCase):
 
     def test_verify_email_confirm_max_attempts(self):
         email = "test@example.com"
-        code = generate_and_store_code(email)
+        manager = EmailVerificationManager(email, "")
+        code = manager.generate_and_store_code()
 
         for _ in range(3):
             data = {"email": email, "code": "000000"}
@@ -276,3 +284,112 @@ class EmailVerificationTests(APITestCase):
         response = self.client.post(self.verify_email_confirm_url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("code", response.data)
+
+
+class LoginLockoutTests(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.login_url = reverse("login")
+        self.email = "test@example.com"
+        self.password = "password-123"
+        self.ip_address = "127.0.0.1"
+
+        self.user = User.objects.create_user(
+            username=self.email,
+            email=self.email,
+            password=self.password
+        )
+
+        caches["lockout"].clear()
+
+    def tearDown(self):
+        caches["lockout"].clear()
+
+    def test_lockout_after_failed_attempts(self):
+        failure_limit = 3
+
+        for i in range(failure_limit):
+            data = {"email": self.email, "password": "wrong_password"}
+            response = self.client.post(self.login_url, data)
+
+            if i < failure_limit - 1:
+                self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+            else:
+                self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+                self.assertEqual(response.data["detail"], "login lockout")
+                self.assertIn("time", response.data)
+
+    def test_lockout_blocks_login(self):
+        lockout_manager = LoginLockoutManager(self.email, self.ip_address)
+
+        for _ in range(3):
+            lockout_manager.record_failed()
+
+        self.assertTrue(lockout_manager.is_locked())
+
+        data = {"email": self.email, "password": self.password}
+        response = self.client.post(self.login_url, data)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["detail"], "login lockout")
+        self.assertIn("time", response.data)
+
+    def test_successful_login_resets_lockout(self):
+        lockout_manager = LoginLockoutManager(self.email, self.ip_address)
+
+        for _ in range(2):
+            lockout_manager.record_failed()
+
+        self.assertFalse(lockout_manager.is_locked())
+
+        data = {"email": self.email, "password": self.password}
+        response = self.client.post(self.login_url, data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertFalse(lockout_manager.is_locked())
+
+    def test_lockout_clear(self):
+        lockout_manager = LoginLockoutManager(self.email, self.ip_address)
+
+        for _ in range(3):
+            lockout_manager.record_failed()
+
+        self.assertTrue(lockout_manager.is_locked())
+
+        lockout_manager.clear()
+        self.assertFalse(lockout_manager.is_locked())
+
+    def test_different_ip_addresses_separate_lockouts(self):
+        ip1 = "127.0.0.1"
+        ip2 = "192.168.1.1"
+
+        lockout_manager1 = LoginLockoutManager(self.email, ip1)
+        lockout_manager2 = LoginLockoutManager(self.email, ip2)
+
+        for _ in range(3):
+            lockout_manager1.record_failed()
+
+        self.assertTrue(lockout_manager1.is_locked())
+        self.assertFalse(lockout_manager2.is_locked())
+
+    def test_different_emails_separate_lockouts(self):
+        email1 = "user1@example.com"
+        email2 = "user2@example.com"
+
+        lockout_manager1 = LoginLockoutManager(email1, self.ip_address)
+        lockout_manager2 = LoginLockoutManager(email2, self.ip_address)
+
+        for _ in range(3):
+            lockout_manager1.record_failed()
+
+        self.assertTrue(lockout_manager1.is_locked())
+        self.assertFalse(lockout_manager2.is_locked())
+
+    def test_lockout_time_increases_exponentially(self):
+        lockout_manager = LoginLockoutManager(self.email, self.ip_address)
+
+        for _ in range(4):
+            for _ in range(3):
+                lockout_manager.record_failed()
+
+            lockout_time = lockout_manager.get_lockout_time()
+            self.assertGreaterEqual(lockout_time, 0)

@@ -4,12 +4,12 @@ from django.test import TestCase
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 
+from id.managers import EmailVerificationManager
 from id.serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetSerializer,
     UserRegistrationSerializer,
 )
-from id.utils import generate_and_store_code, mark_email_verified, verify_code
 
 
 User = get_user_model()
@@ -24,9 +24,10 @@ class UserRegistrationSerializerTest(TestCase):
 
     def test_valid_registration(self):
         email = "newuser@example.com"
-        code = generate_and_store_code(email)
-        verify_code(email, code)
-        mark_email_verified(email)
+        manager = EmailVerificationManager(email, "")
+        code = manager.generate_and_store_code()
+        manager.verify_code(code)
+        manager.mark_verified()
 
         data = {
             "first_name": "New",
