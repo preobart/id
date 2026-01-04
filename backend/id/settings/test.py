@@ -51,7 +51,7 @@ CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
     },
-    "axes": {
+    "lockout": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
     },
     "email_verification": {

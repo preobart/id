@@ -1,0 +1,112 @@
+import secrets
+
+from django.conf import settings
+from django.core.cache import caches
+
+from .errors import EmailSendError
+from .utils.email_utils import send_code_email
+
+
+class EmailVerificationManager:
+    def __init__(self, email, ip_address):
+        self.email = email
+        self.ip_address = ip_address
+        self.cache = caches["email_verification"]
+        self.code_key = f"{email}:code"
+        self.attempts_key = f"{email}:attempts"
+        self.verified_key = f"verified:{email}"
+
+    def _generate_token(self, length=6):
+        base = 10 ** (length - 1)
+        return str(secrets.randbelow(9 * base) + base)
+
+    def generate_and_store_code(self):
+        code = self._generate_token()
+        self.cache.set(self.code_key, code, timeout=15 * 60)
+        self.cache.set(self.attempts_key, 3, timeout=15 * 60)
+        return code
+
+    def verify_code(self, code):
+        stored_code = self.cache.get(self.code_key)
+        if not stored_code:
+            return False
+
+        attempts = self.cache.get(self.attempts_key, 3)
+        if attempts <= 0:
+            self.clear()
+            return False
+
+        if str(stored_code) == str(code):
+            self.clear()
+            return True
+
+        attempts -= 1
+        self.cache.set(self.attempts_key, attempts, timeout=15 * 60)
+        return False
+
+    def is_verified(self):
+        return self.cache.get(self.verified_key, False)
+
+    def mark_verified(self):
+        self.cache.set(self.verified_key, True, timeout=15 * 60)
+
+    def clear(self):
+        self.cache.delete(self.code_key)
+        self.cache.delete(self.attempts_key)
+        self.cache.delete(self.verified_key)
+
+    def send_code(self):
+        code = self.generate_and_store_code()
+        if not send_code_email(self.email, code):
+            raise EmailSendError("Failed to send email")
+
+
+class LoginLockoutManager:
+    def __init__(self, email, ip_address):
+        self.email = email
+        self.ip_address = ip_address
+        self.cache = caches['lockout']
+        self.failed_key = f"failed:{email}:{ip_address}"
+        self.lockout_key = f"locked:{email}:{ip_address}"
+        self.lockout_count_key = f"count:{email}:{ip_address}"
+
+    def _get_lockout_time(self, lockout_count):
+        lockout_times = getattr(settings, "LOCKOUT_EXPONENTIAL_TIMES", [60, 120, 300, 600, 0])
+        index = min(lockout_count - 1, len(lockout_times) - 1)
+        lockout_time = lockout_times[index]
+        return lockout_time
+
+    def is_locked(self):
+        return self.cache.get(self.lockout_key, False)
+
+    def get_lockout_time(self):
+        lockout_count = self.cache.get(self.lockout_count_key, 1)
+        return self._get_lockout_time(lockout_count)
+
+    def record_failed(self):
+        failed_ttl = getattr(settings, "LOCKOUT_FAILED_ATTEMPTS_TTL", 3600)
+        try:
+            count = self.cache.incr(self.failed_key)
+            self.cache.expire(self.failed_key, failed_ttl)
+        except ValueError:
+            self.cache.set(self.failed_key, 1, timeout=failed_ttl)
+            count = 1
+
+        failure_limit = getattr(settings, "LOCKOUT_FAILURE_LIMIT", 3)
+
+        if count >= failure_limit:
+            old_lockout_count = self.cache.get(self.lockout_count_key, 0)
+            lockout_count = old_lockout_count + 1
+            self.cache.set(self.lockout_count_key, lockout_count, timeout=getattr(settings, "LOCKOUT_COUNT_TTL", 86400))
+
+            lockout_time = self._get_lockout_time(lockout_count)
+            timeout = lockout_time if lockout_time > 0 else None
+            self.cache.set(self.lockout_key, True, timeout=timeout)
+            self.cache.delete(self.failed_key)
+            return True
+        return False
+
+    def clear(self):
+        self.cache.delete(self.failed_key)
+        self.cache.delete(self.lockout_key)
+        self.cache.delete(self.lockout_count_key)

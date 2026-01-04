@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from .utils import is_email_verified
+from .managers import EmailVerificationManager
 
 
 User = get_user_model()
@@ -38,7 +38,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         except DjangoValidationError as e:
             errors["password"] = errors.get("password", []) + e.messages
 
-        if not is_email_verified(data["email"]):
+        if not EmailVerificationManager(data["email"], "").is_verified():
             errors["email"] = ["Email must be verified before registration"]
 
         if errors:

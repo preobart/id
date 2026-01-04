@@ -6,16 +6,6 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
-from id.utils import (
-    generate_and_store_code,
-    generate_and_store_password_reset_code,
-    is_email_verified,
-    mark_email_verified,
-    mark_password_reset_verified,
-    verify_code,
-    verify_password_reset_code,
-)
-
 
 User = get_user_model()
 
@@ -25,7 +15,7 @@ class ViewTests(APITestCase):
         self.client = APIClient()
         from django.core.cache import caches
         try:
-            caches["axes"].clear()
+            caches["lockout"].clear()
         except (KeyError, AttributeError):
             pass
 

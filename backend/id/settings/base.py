@@ -54,7 +54,6 @@ INSTALLED_APPS = [
     "rest_framework",
     "drf_spectacular",
     "django_celery_beat",
-    "axes",
     "waffle",
     "id",
 ]
@@ -69,7 +68,6 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "axes.middleware.AxesMiddleware",
     "waffle.middleware.WaffleMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -199,9 +197,9 @@ CACHES = {
         "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
         "TIMEOUT": 60 * 60 * 24 * 7,
     },
-    "axes": {
+    "lockout": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": env("AXES_REDIS_URL", env("DEFENDER_REDIS_URL", "redis://127.0.0.1:6379/1")),
+        "LOCATION": env("LOCKOUT_REDIS_URL", env("DEFENDER_REDIS_URL", "redis://127.0.0.1:6379/1")),
         "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
         "TIMEOUT": 60 * 60 * 24,
     },
@@ -246,15 +244,10 @@ PERMISSIONS_POLICY = {
     "xr-spatial-tracking": [],
 }
 
-# Axes settings
-AXES_ENABLED = True
-AXES_FAILURE_LIMIT = 3
-AXES_COOLOFF_TIME = 600
-AXES_LOCK_OUT_AT_FAILURE = True
-AXES_RESET_ON_SUCCESS = True
-AXES_HANDLER = "axes.handlers.cache.AxesCacheHandler"
-AXES_CACHE = "axes"
-AXES_DISABLE_ACCESS_LOG = False
+LOCKOUT_FAILURE_LIMIT = 3
+LOCKOUT_EXPONENTIAL_TIMES = [5, 10, 20, 30, 0]
+LOCKOUT_FAILED_ATTEMPTS_TTL = 3600
+LOCKOUT_COUNT_TTL = 86400
 
 # Enables HTTPS with HSTS (including subdomains and preload), redirects HTTP to HTTPS,
 # and sets security headers to prevent MIME sniffing, XSS, and clickjacking.

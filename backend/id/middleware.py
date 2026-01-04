@@ -4,7 +4,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 
-from .utils import mask_sensitive
+from .utils.logging_utils import mask_sensitive
 
 
 logger = logging.getLogger("json")

@@ -3,7 +3,6 @@ from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.middleware.csrf import get_token
 from django.views.decorators.csrf import ensure_csrf_cookie
 
-from defender import utils
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -12,7 +11,8 @@ from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 from waffle import flag_is_active, get_waffle_flag_model
 
-from .errors import CaptchaValidationError, EmailSendError
+from .errors import EmailSendError
+from .managers import EmailVerificationManager, LoginLockoutManager
 from .serializers import (
     CheckEmailSerializer,
     EmailVerificationConfirmSerializer,
@@ -23,19 +23,7 @@ from .serializers import (
     UserRegistrationSerializer,
     UserSerializer,
 )
-from .utils import (
-    clear_password_reset,
-    clear_verification,
-    generate_and_store_code,
-    generate_and_store_password_reset_code,
-    is_password_reset_verified,
-    mark_email_verified,
-    mark_password_reset_verified,
-    send_verification_code,
-    validate_captcha,
-    verify_code,
-    verify_password_reset_code,
-)
+from .utils.captcha_utils import check_smartcaptcha
 
 
 User = get_user_model()
@@ -54,7 +42,8 @@ class RegisterView(APIView):
         if serializer.is_valid():
             user = serializer.save()
             email = serializer.validated_data["email"]
-            clear_verification(email)
+            ip_address = request.META.get("REMOTE_ADDR", "")
+            EmailVerificationManager(email, ip_address).clear()
             login(request, user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -70,24 +59,23 @@ class LoginView(APIView):
 
         email = serializer.validated_data["email"]
         password = serializer.validated_data["password"]
-        failure_limit = getattr(settings, "DEFENDER_LOGIN_FAILURE_LIMIT", 2)
-        cooloff_time = utils.get_lockout_cooloff_time(ip_address=utils.get_ip(request), username=email)
-        lockout_detail = (
-            f"You have attempted to login {failure_limit + 1} times with no success. "
-            f"Your account is locked for {cooloff_time} seconds."
-        )
+        ip_address = request.META.get("REMOTE_ADDR", "")
 
-        if utils.is_already_locked(request, get_username=lambda r: email):
-            return Response({"detail": lockout_detail}, status=status.HTTP_403_FORBIDDEN)
+        lockout_manager = LoginLockoutManager(email, ip_address)
+        if lockout_manager.is_locked():
+            lockout_time = lockout_manager.get_lockout_time()
+            return Response({"detail": "login lockout", "time": lockout_time}, status=status.HTTP_403_FORBIDDEN)
 
         user = authenticate(request, username=email, password=password)
 
-        if not utils.check_request(request, user is None, get_username=lambda r: email):
-            return Response({"detail": lockout_detail}, status=status.HTTP_403_FORBIDDEN)
-
         if user is None:
+            is_locked = lockout_manager.record_failed()
+            if is_locked:
+                lockout_time = lockout_manager.get_lockout_time()
+                return Response({"detail": "login lockout", "time": lockout_time}, status=status.HTTP_403_FORBIDDEN)
             return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
+        lockout_manager.clear()
         login(request, user)
         return Response({"user": UserSerializer(user).data}, status=status.HTTP_200_OK)
 
@@ -103,20 +91,19 @@ class PasswordResetView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         email = serializer.validated_data["email"]
+        ip_address = request.META.get("REMOTE_ADDR", "")
 
         if flag_is_active(request, "email_verification_captcha"):
             token = request.data.get("token")
             remote_ip = request.META.get("REMOTE_ADDR")
-            try:
-                validate_captcha(token, remote_ip)
-            except CaptchaValidationError:
+            if not check_smartcaptcha(token, remote_ip):
                 return Response(
                     {"token": ["Invalid or missing captcha"]},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
         try:
-            send_verification_code(email, generate_and_store_password_reset_code)
+            EmailVerificationManager(f"password_reset:{email}", ip_address).send_code()
         except EmailSendError:
             return Response(
                 {"detail": "Failed to send email. Please try again later."},
@@ -140,9 +127,11 @@ class PasswordResetVerifyView(APIView):
 
         email = serializer.validated_data["email"]
         code = serializer.validated_data["code"]
+        ip_address = request.META.get("REMOTE_ADDR", "")
 
-        if verify_password_reset_code(email, code):
-            mark_password_reset_verified(email)
+        verification = EmailVerificationManager(f"password_reset:{email}", ip_address)
+        if verification.verify_code(code):
+            verification.mark_verified()
             return Response(
                 {"verified": True, "detail": "Password reset code verified successfully"},
                 status=status.HTTP_200_OK,
@@ -163,14 +152,16 @@ class PasswordResetConfirmView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         email = serializer.validated_data["email"]
-        if not is_password_reset_verified(email):
+        ip_address = request.META.get("REMOTE_ADDR", "")
+        verification = EmailVerificationManager(f"password_reset:{email}", ip_address)
+        if not verification.is_verified():
             return Response(
                 {"email": ["Email must be verified before password reset"]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         serializer.save()
-        clear_password_reset(email)
+        verification.clear()
         return Response(
             {"detail": "Password has been reset successfully"},
             status=status.HTTP_200_OK,
@@ -186,9 +177,11 @@ class VerifyEmailView(APIView):
         if serializer.is_valid():
             email = serializer.validated_data["email"]
             code = serializer.validated_data["code"]
+            ip_address = request.META.get("REMOTE_ADDR", "")
 
-            if verify_code(email, code):
-                mark_email_verified(email)
+            verification = EmailVerificationManager(email, ip_address)
+            if verification.verify_code(code):
+                verification.mark_verified()
                 return Response(
                     {"verified": True, "detail": "Email verified successfully"},
                     status=status.HTTP_200_OK,
@@ -207,6 +200,7 @@ class CheckEmailView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         email = serializer.validated_data["email"]
+        ip_address = request.META.get("REMOTE_ADDR", "")
         user_exists = User.objects.filter(email=email).exists()
 
         if user_exists:
@@ -215,16 +209,14 @@ class CheckEmailView(APIView):
         if flag_is_active(request, "email_verification_captcha"):
             token = request.data.get("token")
             remote_ip = request.META.get("REMOTE_ADDR")
-            try:
-                validate_captcha(token, remote_ip)
-            except CaptchaValidationError:
+            if not check_smartcaptcha(token, remote_ip):
                 return Response(
                     {"token": ["Invalid or missing captcha"]},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
         try:
-            send_verification_code(email, generate_and_store_code)
+            EmailVerificationManager(email, ip_address).send_code()
         except EmailSendError:
             return Response(
                 {"detail": "Failed to send email. Please try again later."},

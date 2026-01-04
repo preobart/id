@@ -309,19 +309,6 @@ wheels = [
 ]
 
 [[package]]
-name = "django-defender"
-version = "0.9.8"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "django" },
-    { name = "redis" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/29/50/9d88261dab02463e1c5698624bf2515cbaf830175edd215f1c39b03c747b/django-defender-0.9.8.tar.gz", hash = "sha256:b75e001f0fa9912a79514ed29ecd2dd484319540b33ac909a88fd04ec5a4b16d", size = 51181, upload-time = "2024-02-15T21:45:25.418Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/53/e8/e11161f15c4b9efa50953256c595920800ebd89263a74fd9ee823138e49a/django_defender-0.9.8-py3-none-any.whl", hash = "sha256:461c2d6eaee2c4cecf7a126ee272a0b2a7263b91ace7accf6c362947238fa1d3", size = 39697, upload-time = "2024-02-15T21:46:05.501Z" },
-]
-
-[[package]]
 name = "django-extensions"
 version = "4.1"
 source = { registry = "https://pypi.org/simple" }
@@ -484,7 +471,6 @@ dependencies = [
     { name = "django-celery-beat" },
     { name = "django-celery-results" },
     { name = "django-cors-headers" },
-    { name = "django-defender" },
     { name = "django-extensions" },
     { name = "django-otp" },
     { name = "django-permissions-policy" },
@@ -514,7 +500,6 @@ requires-dist = [
     { name = "django-celery-beat", specifier = ">=2.8.1" },
     { name = "django-celery-results", specifier = ">=2.6.0" },
     { name = "django-cors-headers", specifier = ">=4.7.0" },
-    { name = "django-defender", specifier = ">=0.9.8" },
     { name = "django-extensions", specifier = ">=4.1" },
     { name = "django-otp", specifier = ">=1.3.0" },
     { name = "django-permissions-policy", specifier = ">=4.26.0" },
