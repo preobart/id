@@ -3,7 +3,7 @@ import secrets
 from django.conf import settings
 from django.core.cache import caches
 
-from .errors import EmailSendError
+from .errors import EmailSendError, EmailSendLimitExceededError
 from .utils.email_utils import send_code_email
 
 
@@ -15,6 +15,7 @@ class EmailVerificationManager:
         self.code_key = f"code:{email}:{ip_address}"
         self.attempts_key = f"attempts:{email}:{ip_address}"
         self.verified_key = f"verified:{email}:{ip_address}"
+        self.send_count_key = f"send_count:{email}:{ip_address}"
 
     def _generate_token(self, length=6):
         base = 10 ** (length - 1)
@@ -54,11 +55,38 @@ class EmailVerificationManager:
         self.cache.delete(self.code_key)
         self.cache.delete(self.attempts_key)
         self.cache.delete(self.verified_key)
+        self.cache.delete(self.send_count_key)
 
     def send_code(self):
+        current_count = self.cache.get(self.send_count_key, 0)
+        if current_count >= 3:
+            raise EmailSendLimitExceededError()
+
+        try:
+            send_count = self.cache.incr(self.send_count_key)
+            if send_count == 1:
+                self.cache.set(self.send_count_key, send_count, timeout=60 * 60)
+        except (ValueError, TypeError):
+            send_count = 1
+            self.cache.set(self.send_count_key, send_count, timeout=60 * 60)
+        
+        if send_count > 3:
+            try:
+                self.cache.decr(self.send_count_key)
+            except (ValueError, TypeError):
+                pass
+            raise EmailSendLimitExceededError()
+
         code = self.generate_and_store_code()
+        
         if not send_code_email(self.email, code):
-            raise EmailSendError("Failed to send email")
+            try:
+                self.cache.decr(self.send_count_key)
+            except (ValueError, TypeError):
+                pass
+            raise EmailSendError()
+        
+    
 
 
 class LoginLockoutManager:

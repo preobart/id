@@ -4,3 +4,8 @@ class CaptchaValidationError(Exception):
 
 class EmailSendError(Exception):
     """Email send error"""
+
+
+class EmailSendLimitExceededError(Exception):
+    """Email send limit exceeded"""
+

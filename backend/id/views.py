@@ -10,7 +10,7 @@ from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 from waffle import flag_is_active, get_waffle_flag_model
 
-from .errors import EmailSendError
+from .errors import EmailSendError, EmailSendLimitExceededError
 from .managers import EmailVerificationManager, LoginLockoutManager
 from .serializers import (
     CheckEmailSerializer,
@@ -23,6 +23,7 @@ from .serializers import (
     UserSerializer,
 )
 from .utils.captcha_utils import check_smartcaptcha
+from .utils.ip_utils import get_client_ip
 
 
 User = get_user_model()
@@ -41,7 +42,7 @@ class RegisterView(APIView):
         if serializer.is_valid():
             user = serializer.save()
             email = serializer.validated_data["email"]
-            ip_address = request.META.get("REMOTE_ADDR", "")
+            ip_address = get_client_ip(request)
             EmailVerificationManager(email, ip_address).clear()
             login(request, user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -58,7 +59,7 @@ class LoginView(APIView):
 
         email = serializer.validated_data["email"]
         password = serializer.validated_data["password"]
-        ip_address = request.META.get("REMOTE_ADDR", "")
+        ip_address = get_client_ip(request)
 
         lockout_manager = LoginLockoutManager(email, ip_address)
         if lockout_manager.is_locked():
@@ -90,11 +91,11 @@ class PasswordResetView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         email = serializer.validated_data["email"]
-        ip_address = request.META.get("REMOTE_ADDR", "")
+        ip_address = get_client_ip(request)
 
         if flag_is_active(request, "email_verification_captcha"):
             token = request.data.get("token")
-            remote_ip = request.META.get("REMOTE_ADDR")
+            remote_ip = get_client_ip(request)
             if not check_smartcaptcha(token, remote_ip):
                 return Response(
                     {"token": ["Invalid or missing captcha"]},
@@ -103,6 +104,11 @@ class PasswordResetView(APIView):
 
         try:
             EmailVerificationManager(f"password_reset:{email}", ip_address).send_code()
+        except EmailSendLimitExceededError as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
         except EmailSendError:
             return Response(
                 {"detail": "Failed to send email. Please try again later."},
@@ -126,7 +132,7 @@ class PasswordResetVerifyView(APIView):
 
         email = serializer.validated_data["email"]
         code = serializer.validated_data["code"]
-        ip_address = request.META.get("REMOTE_ADDR", "")
+        ip_address = get_client_ip(request)
 
         verification = EmailVerificationManager(f"password_reset:{email}", ip_address)
         if verification.verify_code(code):
@@ -151,7 +157,7 @@ class PasswordResetConfirmView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         email = serializer.validated_data["email"]
-        ip_address = request.META.get("REMOTE_ADDR", "")
+        ip_address = get_client_ip(request)
         verification = EmailVerificationManager(f"password_reset:{email}", ip_address)
         if not verification.is_verified():
             return Response(
@@ -176,7 +182,7 @@ class VerifyEmailView(APIView):
         if serializer.is_valid():
             email = serializer.validated_data["email"]
             code = serializer.validated_data["code"]
-            ip_address = request.META.get("REMOTE_ADDR", "")
+            ip_address = get_client_ip(request)
 
             verification = EmailVerificationManager(email, ip_address)
             if verification.verify_code(code):
@@ -191,6 +197,7 @@ class VerifyEmailView(APIView):
 
 class CheckEmailView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [EmailVerificationThrottle]
     serializer_class = CheckEmailSerializer
 
     def post(self, request, *args, **kwargs):
@@ -199,7 +206,7 @@ class CheckEmailView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         email = serializer.validated_data["email"]
-        ip_address = request.META.get("REMOTE_ADDR", "")
+        ip_address = get_client_ip(request)
         user_exists = User.objects.filter(email=email).exists()
 
         if user_exists:
@@ -209,13 +216,15 @@ class CheckEmailView(APIView):
             token = request.data.get("token")
             remote_ip = request.META.get("REMOTE_ADDR")
             if not check_smartcaptcha(token, remote_ip):
-                return Response(
-                    {"token": ["Invalid or missing captcha"]},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                return Response({"token": "Invalid or missing captcha"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             EmailVerificationManager(email, ip_address).send_code()
+        except EmailSendLimitExceededError:
+            return Response(
+                {"detail": "Maximum number of code send attempts exceeded. Please try again in 1 hour."}, 
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
         except EmailSendError:
             return Response(
                 {"detail": "Failed to send email. Please try again later."},
