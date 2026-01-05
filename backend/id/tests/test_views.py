@@ -32,6 +32,7 @@ class ViewTests(APITestCase):
         self.user = User.objects.create_user(
             username="user", email="user@example.com", password="password-123"
         )
+        self.ip_address = "127.0.0.1"
 
     def test_register_user_successfully(self):
         email = "newuser@example.com"
@@ -48,7 +49,7 @@ class ViewTests(APITestCase):
             "password2": "newpassword123",
             "token": "captcha_token",
         }
-        response = self.client.post(self.register_url, data)
+        response = self.client.post(self.register_url, data, REMOTE_ADDR="")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["email"], email)
         self.assertFalse(EmailVerificationManager(email, "").is_verified())
@@ -154,7 +155,7 @@ class ViewTests(APITestCase):
 
     def test_password_reset_confirm_success(self):
         email = self.user.email
-        manager = EmailVerificationManager(f"password_reset:{email}", "")
+        manager = EmailVerificationManager(f"password_reset:{email}", self.ip_address)
         code = manager.generate_and_store_code()
         manager.verify_code(code)
         manager.mark_verified()
@@ -164,7 +165,7 @@ class ViewTests(APITestCase):
             "password": "newpass123",
             "password2": "newpass123",
         }
-        response = self.client.post(self.password_reset_confirm_url, data)
+        response = self.client.post(self.password_reset_confirm_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("Password has been reset", response.data["detail"])
 
@@ -184,6 +185,7 @@ class EmailVerificationTests(APITestCase):
         self.verify_email_request_url = reverse("check-email")
         self.verify_email_confirm_url = reverse("verify-email")
         cache.clear()
+        self.ip_address = "127.0.0.1"
 
     def tearDown(self):
         cache.clear()
@@ -214,50 +216,50 @@ class EmailVerificationTests(APITestCase):
 
     def test_verify_email_confirm_success(self):
         email = "test@example.com"
-        manager = EmailVerificationManager(email, "")
+        manager = EmailVerificationManager(email, self.ip_address)
         code = manager.generate_and_store_code()
 
         data = {"email": email, "code": str(code)}
-        response = self.client.post(self.verify_email_confirm_url, data)
+        response = self.client.post(self.verify_email_confirm_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["verified"])
-        self.assertTrue(EmailVerificationManager(email, "").is_verified())
+        self.assertTrue(EmailVerificationManager(email, self.ip_address).is_verified())
 
     def test_verify_email_confirm_invalid_code(self):
         email = "test@example.com"
-        manager = EmailVerificationManager(email, "")
+        manager = EmailVerificationManager(email, self.ip_address)
         manager.generate_and_store_code()
 
         data = {"email": email, "code": "000000"}
-        response = self.client.post(self.verify_email_confirm_url, data)
+        response = self.client.post(self.verify_email_confirm_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("code", response.data)
-        self.assertFalse(EmailVerificationManager(email, "").is_verified())
+        self.assertFalse(EmailVerificationManager(email, self.ip_address).is_verified())
 
     def test_verify_email_confirm_expired_code(self):
         email = "test@example.com"
-        manager = EmailVerificationManager(email, "")
+        manager = EmailVerificationManager(email, self.ip_address)
         code = manager.generate_and_store_code()
 
-        caches["email_verification"].delete(f"{email}:code")
+        caches["email_verification"].delete(f"code:{email}:{self.ip_address}")
 
         data = {"email": email, "code": str(code)}
-        response = self.client.post(self.verify_email_confirm_url, data)
+        response = self.client.post(self.verify_email_confirm_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("code", response.data)
 
     def test_verify_email_confirm_max_attempts(self):
         email = "test@example.com"
-        manager = EmailVerificationManager(email, "")
+        manager = EmailVerificationManager(email, self.ip_address)
         code = manager.generate_and_store_code()
 
         for _ in range(3):
             data = {"email": email, "code": "000000"}
-            response = self.client.post(self.verify_email_confirm_url, data)
+            response = self.client.post(self.verify_email_confirm_url, data, REMOTE_ADDR=self.ip_address)
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         data = {"email": email, "code": str(code)}
-        response = self.client.post(self.verify_email_confirm_url, data)
+        response = self.client.post(self.verify_email_confirm_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("code", response.data)
 

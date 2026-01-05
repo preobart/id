@@ -52,7 +52,10 @@ jobs:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
           DJANGO_SETTINGS_MODULE: ${{ secrets.DJANGO_SETTINGS_MODULE }}
-          DEFENDER_REDIS_URL: ${{ secrets.DEFENDER_REDIS_URL }}
+          LOCKOUT_REDIS_URL: ${{ secrets.LOCKOUT_REDIS_URL }}
+          EMAIL_VERIFICATION_REDIS_URL: ${{ secrets.EMAIL_VERIFICATION_REDIS_URL }}
+          SMARTCAPTCHA_SERVER_KEY: ${{ secrets.SMARTCAPTCHA_SERVER_KEY }}
+          SMARTCAPTCHA_VERIFY_URL: ${{ secrets.SMARTCAPTCHA_VERIFY_URL }}
           REDIS_URL: ${{ secrets.REDIS_URL }}
           EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
           EMAIL_HOST_USER: ${{ secrets.EMAIL_HOST_USER }}

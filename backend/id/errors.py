@@ -1,6 +1,6 @@
 class CaptchaValidationError(Exception):
-    pass
+    """Captcha validation error"""
 
 
 class EmailSendError(Exception):
-    pass
+    """Email send error"""

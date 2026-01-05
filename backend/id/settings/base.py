@@ -199,7 +199,7 @@ CACHES = {
     },
     "lockout": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": env("LOCKOUT_REDIS_URL", env("DEFENDER_REDIS_URL", "redis://127.0.0.1:6379/1")),
+        "LOCATION": env("LOCKOUT_REDIS_URL", "redis://127.0.0.1:6379/1"),
         "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
         "TIMEOUT": 60 * 60 * 24,
     },
@@ -244,8 +244,9 @@ PERMISSIONS_POLICY = {
     "xr-spatial-tracking": [],
 }
 
+# Lockout settings
 LOCKOUT_FAILURE_LIMIT = 3
-LOCKOUT_EXPONENTIAL_TIMES = [5, 10, 20, 30, 0]
+LOCKOUT_TIMES = [5, 10, 20, 30, 0]
 LOCKOUT_FAILED_ATTEMPTS_TTL = 3600
 LOCKOUT_COUNT_TTL = 86400
 

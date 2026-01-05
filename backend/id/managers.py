@@ -8,13 +8,13 @@ from .utils.email_utils import send_code_email
 
 
 class EmailVerificationManager:
-    def __init__(self, email, ip_address):
+    def __init__(self, email: str, ip_address: str):
         self.email = email
         self.ip_address = ip_address
         self.cache = caches["email_verification"]
-        self.code_key = f"{email}:code"
-        self.attempts_key = f"{email}:attempts"
-        self.verified_key = f"verified:{email}"
+        self.code_key = f"code:{email}:{ip_address}"
+        self.attempts_key = f"attempts:{email}:{ip_address}"
+        self.verified_key = f"verified:{email}:{ip_address}"
 
     def _generate_token(self, length=6):
         base = 10 ** (length - 1)
@@ -26,7 +26,7 @@ class EmailVerificationManager:
         self.cache.set(self.attempts_key, 3, timeout=15 * 60)
         return code
 
-    def verify_code(self, code):
+    def verify_code(self, code: str):
         stored_code = self.cache.get(self.code_key)
         if not stored_code:
             return False
@@ -36,7 +36,7 @@ class EmailVerificationManager:
             self.clear()
             return False
 
-        if str(stored_code) == str(code):
+        if stored_code == str(code):
             self.clear()
             return True
 
@@ -75,8 +75,7 @@ class LoginLockoutManager:
 
     def get_lockout_time(self):
         lockout_count = self.cache.get(self.lockout_count_key, 1)
-        lockout_times = settings.LOCKOUT_EXPONENTIAL_TIMES
-        return lockout_times[lockout_count - 1]
+        return settings.LOCKOUT_TIMES[lockout_count - 1]
 
     def record_failed(self):
         failed_ttl = settings.LOCKOUT_FAILED_ATTEMPTS_TTL
@@ -94,7 +93,7 @@ class LoginLockoutManager:
             lockout_count = old_lockout_count + 1
             self.cache.set(self.lockout_count_key, lockout_count, timeout=settings.LOCKOUT_COUNT_TTL)
 
-            lockout_times = settings.LOCKOUT_EXPONENTIAL_TIMES
+            lockout_times = settings.LOCKOUT_TIMES
             lockout_time = lockout_times[lockout_count - 1]
             timeout = lockout_time if lockout_time > 0 else None
             self.cache.set(self.lockout_key, True, timeout=timeout)

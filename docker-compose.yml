@@ -29,7 +29,7 @@ services:
     restart: always
     command: >
       sh -c "
-        python manage.py makemigrations --dry-run --check &&
+        python manage.py makemigrations --no-input &&
         python manage.py migrate --no-input &&
         gunicorn id.wsgi:application \
           --bind 0.0.0.0:8081 \
@@ -59,7 +59,7 @@ services:
       POSTGRES_USER: {{ env.POSTGRES_USER }}
       POSTGRES_PASSWORD: {{ env.POSTGRES_PASSWORD }}
       POSTGRES_DB: {{ env.POSTGRES_DB }}
-      DEFENDER_REDIS_URL: {{ env.DEFENDER_REDIS_URL }}
+      LOCKOUT_REDIS_URL: {{ env.LOCKOUT_REDIS_URL }}
       REDIS_URL: {{ env.REDIS_URL }}
       EMAIL_VERIFICATION_REDIS_URL: {{ env.EMAIL_VERIFICATION_REDIS_URL }}
       EMAIL_HOST_PASSWORD: {{ env.EMAIL_HOST_PASSWORD }}
