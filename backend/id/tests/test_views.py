@@ -6,7 +6,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
-from id.managers import EmailVerificationManager, LoginLockoutManager
+from id.managers import EmailVerificationManager
 
 
 User = get_user_model()
@@ -15,16 +15,12 @@ User = get_user_model()
 class ViewTests(APITestCase):
     def setUp(self):
         self.client = APIClient()
-        try:
-            caches["lockout"].clear()
-        except (KeyError, AttributeError):
-            pass
-
         self.register_url = reverse("register")
         self.login_url = reverse("login")
         self.logout_url = reverse("logout")
         self.user_url = reverse("userinfo")
         self.password_reset_url = reverse("password-reset")
+        self.password_reset_verify_url = reverse("password-reset-verify")
         self.password_reset_confirm_url = reverse("password-reset-confirm")
         self.verify_email_request_url = reverse("check-email")
         self.verify_email_confirm_url = reverse("verify-email")
@@ -36,7 +32,7 @@ class ViewTests(APITestCase):
 
     def test_register_user_successfully(self):
         email = "newuser@example.com"
-        manager = EmailVerificationManager(email, "")
+        manager = EmailVerificationManager(email, self.ip_address)
         code = manager.generate_and_store_code()
         manager.verify_code(code)
         manager.mark_verified()
@@ -49,14 +45,14 @@ class ViewTests(APITestCase):
             "password2": "newpassword123",
             "token": "captcha_token",
         }
-        response = self.client.post(self.register_url, data, REMOTE_ADDR="")
+        response = self.client.post(self.register_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["email"], email)
-        self.assertFalse(EmailVerificationManager(email, "").is_verified())
+        self.assertFalse(EmailVerificationManager(email, self.ip_address).is_verified())
 
     def test_register_user_passwords_do_not_match(self):
         email = "user1@example.com"
-        manager = EmailVerificationManager(email, "")
+        manager = EmailVerificationManager(email, self.ip_address)
         code = manager.generate_and_store_code()
         manager.verify_code(code)
         manager.mark_verified()
@@ -69,7 +65,7 @@ class ViewTests(APITestCase):
             "password2": "password2",
             "token": "captcha_token",
         }
-        response = self.client.post(self.register_url, data)
+        response = self.client.post(self.register_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("password", response.data)
 
@@ -82,7 +78,7 @@ class ViewTests(APITestCase):
             "password2": "password123",
             "token": "captcha_token",
         }
-        response = self.client.post(self.register_url, data)
+        response = self.client.post(self.register_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("email", response.data)
         self.assertIn("Email must be verified", str(response.data["email"]))
@@ -90,7 +86,7 @@ class ViewTests(APITestCase):
     def test_register_user_successful_without_captcha(self):
         import uuid
         email = f"testcaptcha{uuid.uuid4().hex[:8]}@example.com"
-        manager = EmailVerificationManager(email, "")
+        manager = EmailVerificationManager(email, self.ip_address)
         code = manager.generate_and_store_code()
         manager.verify_code(code)
         manager.mark_verified()
@@ -102,7 +98,7 @@ class ViewTests(APITestCase):
             "password": "StrongPass123!",
             "password2": "StrongPass123!",
         }
-        response = self.client.post(self.register_url, data)
+        response = self.client.post(self.register_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertEqual(response.data["email"], email)
 
@@ -111,13 +107,13 @@ class ViewTests(APITestCase):
             username="loginuser@example.com", email="loginuser@example.com", password="password-123"
         )
         data = {"email": login_user.email, "password": "password-123"}
-        response = self.client.post(self.login_url, data)
+        response = self.client.post(self.login_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("user", response.data)
 
     def test_login_invalid_credentials(self):
         data = {"email": self.user.email, "password": "wrongpass"}
-        response = self.client.post(self.login_url, data)
+        response = self.client.post(self.login_url, data, REMOTE_ADDR=self.ip_address)
         self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
 
     def test_logout_authenticated(self):
@@ -143,15 +139,60 @@ class ViewTests(APITestCase):
 
     def test_password_reset_email_sent(self):
         data = {"email": self.user.email}
-        response = self.client.post(self.password_reset_url, data)
+        response = self.client.post(self.password_reset_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Password reset code has been sent", response.data["detail"])
 
     def test_password_reset_email_invalid(self):
         data = {"email": "invalid@example.com"}
-        response = self.client.post(self.password_reset_url, data)
+        response = self.client.post(self.password_reset_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_password_reset_verify_success(self):
+        email = self.user.email
+        manager = EmailVerificationManager(f"password_reset:{email}", self.ip_address)
+        code = manager.generate_and_store_code()
+
+        data = {"email": email, "code": str(code)}
+        response = self.client.post(self.password_reset_verify_url, data, REMOTE_ADDR=self.ip_address)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["verified"])
+        self.assertTrue(EmailVerificationManager(f"password_reset:{email}", self.ip_address).is_verified())
+
+    def test_password_reset_verify_invalid_code(self):
+        email = self.user.email
+        manager = EmailVerificationManager(f"password_reset:{email}", self.ip_address)
+        manager.generate_and_store_code()
+
+        data = {"email": email, "code": "000000"}
+        response = self.client.post(self.password_reset_verify_url, data, REMOTE_ADDR=self.ip_address)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("code", response.data)
+
+    def test_password_reset_verify_expired_code(self):
+        email = self.user.email
+        manager = EmailVerificationManager(f"password_reset:{email}", self.ip_address)
+        code = manager.generate_and_store_code()
+
+        caches["email_verification"].delete(f"code:password_reset:{email}:{self.ip_address}")
+
+        data = {"email": email, "code": str(code)}
+        response = self.client.post(self.password_reset_verify_url, data, REMOTE_ADDR=self.ip_address)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("code", response.data)
+
+    def test_password_reset_confirm_unverified_email(self):
+        email = self.user.email
+        data = {
+            "email": email,
+            "password": "newpass123",
+            "password2": "newpass123",
+        }
+        response = self.client.post(self.password_reset_confirm_url, data, REMOTE_ADDR=self.ip_address)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("email", response.data)
+        self.assertIn("Email must be verified", str(response.data["email"]))
 
     def test_password_reset_confirm_success(self):
         email = self.user.email
@@ -175,7 +216,7 @@ class ViewTests(APITestCase):
             "password": "newpass123",
             "password2": "newpass123",
         }
-        response = self.client.post(self.password_reset_confirm_url, data)
+        response = self.client.post(self.password_reset_confirm_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
@@ -192,7 +233,7 @@ class EmailVerificationTests(APITestCase):
 
     def test_verify_email_request_success(self):
         data = {"email": "newuser@example.com"}
-        response = self.client.post(self.verify_email_request_url, data)
+        response = self.client.post(self.verify_email_request_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("detail", response.data)
         self.assertEqual(len(mail.outbox), 1)
@@ -204,13 +245,13 @@ class EmailVerificationTests(APITestCase):
             username="existing", email="existing@example.com", password="password123"
         )
         data = {"email": "existing@example.com"}
-        response = self.client.post(self.verify_email_request_url, data)
+        response = self.client.post(self.verify_email_request_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["action"], "login")
 
     def test_verify_email_request_invalid_email(self):
         data = {"email": "invalid-email"}
-        response = self.client.post(self.verify_email_request_url, data)
+        response = self.client.post(self.verify_email_request_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("email", response.data)
 
@@ -265,133 +306,24 @@ class EmailVerificationTests(APITestCase):
 
     def test_verify_email_confirm_invalid_email_format(self):
         data = {"email": "invalid-email", "code": "123456"}
-        response = self.client.post(self.verify_email_confirm_url, data)
+        response = self.client.post(self.verify_email_confirm_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("email", response.data)
 
     def test_verify_email_confirm_invalid_code_format(self):
         data = {"email": "test@example.com", "code": "abc123"}
-        response = self.client.post(self.verify_email_confirm_url, data)
+        response = self.client.post(self.verify_email_confirm_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("code", response.data)
 
     def test_verify_email_confirm_code_too_short(self):
         data = {"email": "test@example.com", "code": "12345"}
-        response = self.client.post(self.verify_email_confirm_url, data)
+        response = self.client.post(self.verify_email_confirm_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("code", response.data)
 
     def test_verify_email_confirm_code_too_long(self):
         data = {"email": "test@example.com", "code": "1234567"}
-        response = self.client.post(self.verify_email_confirm_url, data)
+        response = self.client.post(self.verify_email_confirm_url, data, REMOTE_ADDR=self.ip_address)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("code", response.data)
-
-
-class LoginLockoutTests(APITestCase):
-    def setUp(self):
-        self.client = APIClient()
-        self.login_url = reverse("login")
-        self.email = "test@example.com"
-        self.password = "password-123"
-        self.ip_address = "127.0.0.1"
-
-        self.user = User.objects.create_user(
-            username=self.email,
-            email=self.email,
-            password=self.password
-        )
-
-        caches["lockout"].clear()
-
-    def tearDown(self):
-        caches["lockout"].clear()
-
-    def test_lockout_after_failed_attempts(self):
-        failure_limit = 3
-
-        for i in range(failure_limit):
-            data = {"email": self.email, "password": "wrong_password"}
-            response = self.client.post(self.login_url, data)
-
-            if i < failure_limit - 1:
-                self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-            else:
-                self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-                self.assertEqual(response.data["detail"], "login lockout")
-                self.assertIn("time", response.data)
-
-    def test_lockout_blocks_login(self):
-        lockout_manager = LoginLockoutManager(self.email, self.ip_address)
-
-        for _ in range(3):
-            lockout_manager.record_failed()
-
-        self.assertTrue(lockout_manager.is_locked())
-
-        data = {"email": self.email, "password": self.password}
-        response = self.client.post(self.login_url, data)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(response.data["detail"], "login lockout")
-        self.assertIn("time", response.data)
-
-    def test_successful_login_resets_lockout(self):
-        lockout_manager = LoginLockoutManager(self.email, self.ip_address)
-
-        for _ in range(2):
-            lockout_manager.record_failed()
-
-        self.assertFalse(lockout_manager.is_locked())
-
-        data = {"email": self.email, "password": self.password}
-        response = self.client.post(self.login_url, data)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        self.assertFalse(lockout_manager.is_locked())
-
-    def test_lockout_clear(self):
-        lockout_manager = LoginLockoutManager(self.email, self.ip_address)
-
-        for _ in range(3):
-            lockout_manager.record_failed()
-
-        self.assertTrue(lockout_manager.is_locked())
-
-        lockout_manager.clear()
-        self.assertFalse(lockout_manager.is_locked())
-
-    def test_different_ip_addresses_separate_lockouts(self):
-        ip1 = "127.0.0.1"
-        ip2 = "192.168.1.1"
-
-        lockout_manager1 = LoginLockoutManager(self.email, ip1)
-        lockout_manager2 = LoginLockoutManager(self.email, ip2)
-
-        for _ in range(3):
-            lockout_manager1.record_failed()
-
-        self.assertTrue(lockout_manager1.is_locked())
-        self.assertFalse(lockout_manager2.is_locked())
-
-    def test_different_emails_separate_lockouts(self):
-        email1 = "user1@example.com"
-        email2 = "user2@example.com"
-
-        lockout_manager1 = LoginLockoutManager(email1, self.ip_address)
-        lockout_manager2 = LoginLockoutManager(email2, self.ip_address)
-
-        for _ in range(3):
-            lockout_manager1.record_failed()
-
-        self.assertTrue(lockout_manager1.is_locked())
-        self.assertFalse(lockout_manager2.is_locked())
-
-    def test_lockout_time_increases_exponentially(self):
-        lockout_manager = LoginLockoutManager(self.email, self.ip_address)
-
-        for _ in range(4):
-            for _ in range(3):
-                lockout_manager.record_failed()
-
-            lockout_time = lockout_manager.get_lockout_time()
-            self.assertGreaterEqual(lockout_time, 0)

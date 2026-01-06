@@ -17,14 +17,16 @@ class EmailVerificationManager:
         self.verified_key = f"verified:{email}:{ip_address}"
         self.send_count_key = f"send_count:{email}:{ip_address}"
 
-    def _generate_token(self, length=6):
+    def _generate_token(self, length=None):
+        if length is None:
+            length = settings.EMAIL_VERIFICATION_CODE_LENGTH
         base = 10 ** (length - 1)
         return str(secrets.randbelow(9 * base) + base)
 
     def generate_and_store_code(self):
         code = self._generate_token()
-        self.cache.set(self.code_key, code, timeout=15 * 60)
-        self.cache.set(self.attempts_key, 3, timeout=15 * 60)
+        self.cache.set(self.code_key, code, timeout=settings.EMAIL_VERIFICATION_CODE_TTL)
+        self.cache.set(self.attempts_key, settings.EMAIL_VERIFICATION_ATTEMPTS, timeout=settings.EMAIL_VERIFICATION_CODE_TTL)
         return code
 
     def verify_code(self, code: str):
@@ -32,7 +34,7 @@ class EmailVerificationManager:
         if not stored_code:
             return False
 
-        attempts = self.cache.get(self.attempts_key, 3)
+        attempts = self.cache.get(self.attempts_key, settings.EMAIL_VERIFICATION_ATTEMPTS)
         if attempts <= 0:
             self.clear()
             return False
@@ -42,14 +44,16 @@ class EmailVerificationManager:
             return True
 
         attempts -= 1
-        self.cache.set(self.attempts_key, attempts, timeout=15 * 60)
+        timeout = settings.EMAIL_VERIFICATION_CODE_TTL
+        self.cache.set(self.attempts_key, attempts, timeout=timeout)
+        self.cache.set(self.code_key, stored_code, timeout=timeout)
         return False
 
     def is_verified(self):
         return self.cache.get(self.verified_key, False)
 
     def mark_verified(self):
-        self.cache.set(self.verified_key, True, timeout=15 * 60)
+        self.cache.set(self.verified_key, True, timeout=settings.EMAIL_VERIFICATION_VERIFIED_TTL)
 
     def clear(self):
         self.cache.delete(self.code_key)
@@ -58,36 +62,19 @@ class EmailVerificationManager:
         self.cache.delete(self.send_count_key)
 
     def send_code(self):
-        current_count = self.cache.get(self.send_count_key, 0)
-        if current_count >= 3:
+        if self.cache.get(self.send_count_key, 0) >= settings.EMAIL_VERIFICATION_SEND_LIMIT:
             raise EmailSendLimitExceededError()
-
-        try:
-            send_count = self.cache.incr(self.send_count_key)
-            if send_count == 1:
-                self.cache.set(self.send_count_key, send_count, timeout=60 * 60)
-        except (ValueError, TypeError):
-            send_count = 1
-            self.cache.set(self.send_count_key, send_count, timeout=60 * 60)
         
-        if send_count > 3:
-            try:
-                self.cache.decr(self.send_count_key)
-            except (ValueError, TypeError):
-                pass
-            raise EmailSendLimitExceededError()
-
         code = self.generate_and_store_code()
-        
         if not send_code_email(self.email, code):
-            try:
-                self.cache.decr(self.send_count_key)
-            except (ValueError, TypeError):
-                pass
             raise EmailSendError()
         
-    
-
+        try:
+            current_count = self.cache.incr(self.send_count_key)
+        except ValueError:
+            current_count = 1
+        
+        self.cache.set(self.send_count_key, current_count, timeout=settings.EMAIL_VERIFICATION_SEND_COUNT_TTL)
 
 class LoginLockoutManager:
     def __init__(self, email, ip_address):
@@ -103,7 +90,10 @@ class LoginLockoutManager:
 
     def get_lockout_time(self):
         lockout_count = self.cache.get(self.lockout_count_key, 1)
-        return settings.LOCKOUT_TIMES[lockout_count - 1]
+        lockout_times = settings.LOCKOUT_TIMES
+        if lockout_count > len(lockout_times):
+            return lockout_times[-1]
+        return lockout_times[lockout_count - 1]
 
     def record_failed(self):
         failed_ttl = settings.LOCKOUT_FAILED_ATTEMPTS_TTL
@@ -114,16 +104,17 @@ class LoginLockoutManager:
             self.cache.set(self.failed_key, 1, timeout=failed_ttl)
             count = 1
 
-        failure_limit = settings.LOCKOUT_FAILURE_LIMIT
-
-        if count >= failure_limit:
+        if count >= settings.LOCKOUT_FAILURE_LIMIT:
             old_lockout_count = self.cache.get(self.lockout_count_key, 0)
             lockout_count = old_lockout_count + 1
             self.cache.set(self.lockout_count_key, lockout_count, timeout=settings.LOCKOUT_COUNT_TTL)
 
             lockout_times = settings.LOCKOUT_TIMES
-            lockout_time = lockout_times[lockout_count - 1]
-            timeout = lockout_time if lockout_time > 0 else None
+            if lockout_count > len(lockout_times):
+                lockout_time = lockout_times[-1]
+            else:
+                lockout_time = lockout_times[lockout_count - 1]
+            timeout = lockout_time * 60
             self.cache.set(self.lockout_key, True, timeout=timeout)
             self.cache.delete(self.failed_key)
             return True

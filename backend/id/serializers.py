@@ -6,6 +6,7 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from .managers import EmailVerificationManager
+from .utils.ip_utils import get_client_ip
 
 
 User = get_user_model()
@@ -38,7 +39,9 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         except DjangoValidationError as e:
             errors["password"] = errors.get("password", []) + e.messages
 
-        if not EmailVerificationManager(data["email"], "").is_verified():
+        request = self.context.get("request")
+        ip_address = get_client_ip(request) if request else ""
+        if not EmailVerificationManager(data["email"], ip_address).is_verified():
             errors["email"] = ["Email must be verified before registration"]
 
         if errors:

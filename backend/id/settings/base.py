@@ -187,6 +187,21 @@ CSRF_TRUSTED_ORIGINS = []
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 
+# Email verification settings
+EMAIL_VERIFICATION_CODE_LENGTH = 6  # Length of verification code in digits
+EMAIL_VERIFICATION_CODE_TTL = 10 * 60  # Time to live for verification code
+EMAIL_VERIFICATION_ATTEMPTS = 3  # Maximum number of attempts to verify the code
+EMAIL_VERIFICATION_SEND_LIMIT = 3  # Maximum number of code send requests
+EMAIL_VERIFICATION_SEND_COUNT_TTL = 60 * 60  # Time to live for send count limit reset
+EMAIL_VERIFICATION_VERIFIED_TTL = 30 * 60  # Time to live for verified flag after successful code verification
+
+# Lockout settings
+LOCKOUT_FAILURE_LIMIT = 3  # Number of failed login attempts before account lockout
+LOCKOUT_TIMES = [1, 3, 5, 10, 15, 60, 1440]  # Lockout durations in minutes
+LOCKOUT_FAILED_ATTEMPTS_TTL = 60 * 60  # Time to live for failed attempts counter reset
+LOCKOUT_COUNT_TTL = 86400 * 7  # Time to live for lockout count history
+
+
 # Stores sessions in Redis cache using the default cache, with a one-week expiration.
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS = "default"
@@ -207,7 +222,7 @@ CACHES = {
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": env("EMAIL_VERIFICATION_REDIS_URL", "redis://127.0.0.1:6379/2"),
         "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
-        "TIMEOUT": 15 * 60,
+        "TIMEOUT": EMAIL_VERIFICATION_CODE_TTL,
     },
 }
 
@@ -243,12 +258,6 @@ PERMISSIONS_POLICY = {
     "usb": [],
     "xr-spatial-tracking": [],
 }
-
-# Lockout settings
-LOCKOUT_FAILURE_LIMIT = 3
-LOCKOUT_TIMES = [5, 10, 20, 30, 0]
-LOCKOUT_FAILED_ATTEMPTS_TTL = 3600
-LOCKOUT_COUNT_TTL = 86400
 
 # Enables HTTPS with HSTS (including subdomains and preload), redirects HTTP to HTTPS,
 # and sets security headers to prevent MIME sniffing, XSS, and clickjacking.

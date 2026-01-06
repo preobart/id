@@ -38,7 +38,7 @@ class RegisterView(APIView):
     serializer_class = UserRegistrationSerializer
 
     def post(self, request, *args, **kwargs):
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.serializer_class(data=request.data, context={"request": request})
         if serializer.is_valid():
             user = serializer.save()
             email = serializer.validated_data["email"]
@@ -212,7 +212,7 @@ class CheckEmailView(APIView):
         if user_exists:
             return Response({"action": "login"}, status=status.HTTP_200_OK)
 
-        if flag_is_active(request, "email_verification_captcha"):
+        if flag_is_active(request, "smartcaptcha_enabled"):
             token = request.data.get("token")
             remote_ip = request.META.get("REMOTE_ADDR")
             if not check_smartcaptcha(token, remote_ip):
@@ -222,12 +222,12 @@ class CheckEmailView(APIView):
             EmailVerificationManager(email, ip_address).send_code()
         except EmailSendLimitExceededError:
             return Response(
-                {"detail": "Maximum number of code send attempts exceeded. Please try again in 1 hour."}, 
+                {"detail": "Maximum number of code send attempts exceeded"}, 
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
         except EmailSendError:
             return Response(
-                {"detail": "Failed to send email. Please try again later."},
+                {"detail": "Failed to send email"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
