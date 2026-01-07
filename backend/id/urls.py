@@ -27,28 +27,15 @@ urlpatterns = [
                 path("register", views.RegisterView.as_view(), name="register"),
                 path("login", views.LoginView.as_view(), name="login"),
                 path("logout", views.logout_view, name="logout"),
-                path("csrf", views.csrf_view, name="csrf"),
                 path("userinfo", views.userinfo_view, name="userinfo"),
-                path("password-reset", views.PasswordResetView.as_view(), name="password-reset"),
-                path(
-                    "password-reset-verify",
-                    views.PasswordResetVerifyView.as_view(),
-                    name="password-reset-verify",
-                ),
+                path("csrf", views.csrf_view, name="csrf"),
+                path("check-email", views.check_email_view, name="check-email"),
+                path("send-code", views.SendCodeView.as_view(), name="send-code"),
+                path("verify-code", views.VerifyCodeView.as_view(), name="verify-code"),
                 path(
                     "password-reset-confirm",
                     views.PasswordResetConfirmView.as_view(),
                     name="password-reset-confirm",
-                ),
-                path(
-                    "verify-email",
-                    views.VerifyEmailView.as_view(),
-                    name="verify-email",
-                ),
-                path(
-                    "check-email",
-                    views.CheckEmailView.as_view(),
-                    name="check-email",
                 ),
             ]
         ),

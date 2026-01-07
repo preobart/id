@@ -187,13 +187,13 @@ CSRF_TRUSTED_ORIGINS = []
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 
-# Email verification settings
-EMAIL_VERIFICATION_CODE_LENGTH = 6  # Length of verification code in digits
-EMAIL_VERIFICATION_CODE_TTL = 10 * 60  # Time to live for verification code
-EMAIL_VERIFICATION_ATTEMPTS = 3  # Maximum number of attempts to verify the code
-EMAIL_VERIFICATION_SEND_LIMIT = 3  # Maximum number of code send requests
-EMAIL_VERIFICATION_SEND_COUNT_TTL = 60 * 60  # Time to live for send count limit reset
-EMAIL_VERIFICATION_VERIFIED_TTL = 30 * 60  # Time to live for verified flag after successful code verification
+# Verification settings
+VERIFICATION_CODE_LENGTH = 6  # Length of verification code in digits
+VERIFICATION_CODE_TTL = 10 * 60  # Time to live for verification code
+VERIFICATION_ATTEMPTS = 3  # Maximum number of attempts to verify the code
+VERIFICATION_EMAIL_SEND_LIMIT = 3  # Maximum number of code send requests
+VERIFICATION_EMAIL_SEND_COUNT_TTL = 60 * 60  # Time to live for send count limit reset
+VERIFICATION_VERIFIED_TTL = 30 * 60  # Time to live for verified flag after successful code verification
 
 # Lockout settings
 LOCKOUT_FAILURE_LIMIT = 3  # Number of failed login attempts before account lockout
@@ -222,7 +222,7 @@ CACHES = {
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": env("EMAIL_VERIFICATION_REDIS_URL", "redis://127.0.0.1:6379/2"),
         "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
-        "TIMEOUT": EMAIL_VERIFICATION_CODE_TTL,
+        "TIMEOUT": VERIFICATION_CODE_TTL,
     },
 }
 

@@ -7,26 +7,26 @@ from .errors import EmailSendError, EmailSendLimitExceededError
 from .utils.email_utils import send_code_email
 
 
-class EmailVerificationManager:
-    def __init__(self, email: str, ip_address: str):
+class VerificationManager:
+    def __init__(self, email: str, ip_address: str, code_type: str):
         self.email = email
         self.ip_address = ip_address
         self.cache = caches["email_verification"]
-        self.code_key = f"code:{email}:{ip_address}"
-        self.attempts_key = f"attempts:{email}:{ip_address}"
-        self.verified_key = f"verified:{email}:{ip_address}"
-        self.send_count_key = f"send_count:{email}:{ip_address}"
+        self.code_key = f"{code_type}:code:{email}:{ip_address}"
+        self.attempts_key = f"{code_type}:attempts:{email}:{ip_address}"
+        self.verified_key = f"{code_type}:verified:{email}:{ip_address}"
+        self.send_count_key = f"{code_type}:send_count:{email}:{ip_address}"
 
     def _generate_token(self, length=None):
         if length is None:
-            length = settings.EMAIL_VERIFICATION_CODE_LENGTH
+            length = settings.VERIFICATION_CODE_LENGTH
         base = 10 ** (length - 1)
         return str(secrets.randbelow(9 * base) + base)
 
     def generate_and_store_code(self):
         code = self._generate_token()
-        self.cache.set(self.code_key, code, timeout=settings.EMAIL_VERIFICATION_CODE_TTL)
-        self.cache.set(self.attempts_key, settings.EMAIL_VERIFICATION_ATTEMPTS, timeout=settings.EMAIL_VERIFICATION_CODE_TTL)
+        self.cache.set(self.code_key, code, timeout=settings.VERIFICATION_CODE_TTL)
+        self.cache.set(self.attempts_key, settings.VERIFICATION_ATTEMPTS, timeout=settings.VERIFICATION_CODE_TTL)
         return code
 
     def verify_code(self, code: str):
@@ -34,7 +34,7 @@ class EmailVerificationManager:
         if not stored_code:
             return False
 
-        attempts = self.cache.get(self.attempts_key, settings.EMAIL_VERIFICATION_ATTEMPTS)
+        attempts = self.cache.get(self.attempts_key, settings.VERIFICATION_ATTEMPTS)
         if attempts <= 0:
             self.clear()
             return False
@@ -44,7 +44,7 @@ class EmailVerificationManager:
             return True
 
         attempts -= 1
-        timeout = settings.EMAIL_VERIFICATION_CODE_TTL
+        timeout = settings.VERIFICATION_CODE_TTL
         self.cache.set(self.attempts_key, attempts, timeout=timeout)
         self.cache.set(self.code_key, stored_code, timeout=timeout)
         return False
@@ -53,7 +53,7 @@ class EmailVerificationManager:
         return self.cache.get(self.verified_key, False)
 
     def mark_verified(self):
-        self.cache.set(self.verified_key, True, timeout=settings.EMAIL_VERIFICATION_VERIFIED_TTL)
+        self.cache.set(self.verified_key, True, timeout=settings.VERIFICATION_VERIFIED_TTL)
 
     def clear(self):
         self.cache.delete(self.code_key)
@@ -62,7 +62,7 @@ class EmailVerificationManager:
         self.cache.delete(self.send_count_key)
 
     def send_code(self):
-        if self.cache.get(self.send_count_key, 0) >= settings.EMAIL_VERIFICATION_SEND_LIMIT:
+        if self.cache.get(self.send_count_key, 0) >= settings.VERIFICATION_EMAIL_SEND_LIMIT:
             raise EmailSendLimitExceededError()
         
         code = self.generate_and_store_code()
@@ -74,7 +74,7 @@ class EmailVerificationManager:
         except ValueError:
             current_count = 1
         
-        self.cache.set(self.send_count_key, current_count, timeout=settings.EMAIL_VERIFICATION_SEND_COUNT_TTL)
+        self.cache.set(self.send_count_key, current_count, timeout=settings.VERIFICATION_EMAIL_SEND_COUNT_TTL)
 
 class LoginLockoutManager:
     def __init__(self, email, ip_address):

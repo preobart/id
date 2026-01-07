@@ -6,7 +6,7 @@ from .base import *
 DEBUG = False
 
 SECRET_KEY = env("SECRET_KEY")
-ALLOWED_HOSTS = env("ALLOWED_HOSTS").split(",")
+ALLOWED_HOSTS = env("ALLOWED_HOSTS", default="").split(",")
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
     re.compile(r) for r in env("CORS_ALLOWED_ORIGIN_REGEXES", "").split(",") if r

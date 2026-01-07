@@ -5,13 +5,14 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from .managers import EmailVerificationManager
+from .managers import VerificationManager
 from .utils.ip_utils import get_client_ip
 
 
 User = get_user_model()
 
-class UserRegistrationSerializer(serializers.ModelSerializer):
+
+class RegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     password2 = serializers.CharField(write_only=True)
     first_name = serializers.CharField(required=True)
@@ -40,8 +41,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             errors["password"] = errors.get("password", []) + e.messages
 
         request = self.context.get("request")
-        ip_address = get_client_ip(request) if request else ""
-        if not EmailVerificationManager(data["email"], ip_address).is_verified():
+        ip_address = get_client_ip(request)
+        if not VerificationManager(data["email"], ip_address, "email_verification").is_verified():
             errors["email"] = ["Email must be verified before registration"]
 
         if errors:
@@ -56,27 +57,27 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return user
 
 
-class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ("id", "first_name", "last_name", "email")
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(required=True, write_only=True)
 
 
-class PasswordResetSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+class CodeSendSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    code_type = serializers.ChoiceField(
+        choices=[("password_reset", "password_reset"), ("email_verification", "email_verification")],
+        required=True
+    )
     token = serializers.CharField(required=False, write_only=True, allow_blank=True)
 
-    def validate_email(self, email):
-        try:
-            self.user = User.objects.get(email=email)
-        except User.DoesNotExist as e:
-            raise serializers.ValidationError(["User with this email does not exist"]) from e
-        return email
 
-
-class PasswordResetVerifySerializer(serializers.Serializer):
+class CodeVerifySerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
     code = serializers.CharField(required=True, min_length=6, max_length=6)
+    code_type = serializers.ChoiceField(
+        choices=[("password_reset", "password_reset"), ("email_verification", "email_verification")],
+        required=True
+    )
 
     def validate_code(self, code):
         if not code.isdigit():
@@ -118,21 +119,7 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         return user
 
 
-class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
-    password = serializers.CharField(required=True, write_only=True)
-
-
-class EmailVerificationConfirmSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
-    code = serializers.CharField(required=True, min_length=6, max_length=6)
-
-    def validate_code(self, code):
-        if not code.isdigit():
-            raise serializers.ValidationError(["Code must contain only digits"])
-        return code
-
-
-class CheckEmailSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
-    token = serializers.CharField(required=False, write_only=True, allow_blank=True)
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ("id", "first_name", "last_name", "email")
