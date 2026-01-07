@@ -76,6 +76,7 @@ class VerificationManager:
         
         self.cache.set(self.send_count_key, current_count, timeout=settings.VERIFICATION_EMAIL_SEND_COUNT_TTL)
 
+
 class LoginLockoutManager:
     def __init__(self, email, ip_address):
         self.email = email

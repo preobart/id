@@ -6,6 +6,7 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from .managers import VerificationManager
+from .response_codes import ResponseCode
 from .utils.ip_utils import get_client_ip
 
 
@@ -21,7 +22,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
         required=True,
         validators=[
             UniqueValidator(
-                queryset=User.objects.all(), message=["User with this email already exists"]
+                queryset=User.objects.all(), message=[ResponseCode.EMAIL_ALREADY_EXISTS]
             )
         ],
     )
@@ -33,17 +34,19 @@ class RegistrationSerializer(serializers.ModelSerializer):
     def validate(self, data):
         errors = {}
         if data["password"] != data["password2"]:
-            errors["password"] = ["Passwords do not match"]
+            errors["password"] = [ResponseCode.PASSWORD_MISMATCH]
 
         try:
             validate_password(data["password"])
-        except DjangoValidationError as e:
-            errors["password"] = errors.get("password", []) + e.messages
+        except DjangoValidationError:
+            password_errors = errors.get("password", [])
+            password_errors.append(ResponseCode.PASSWORD_WEAK)
+            errors["password"] = password_errors
 
         request = self.context.get("request")
         ip_address = get_client_ip(request)
         if not VerificationManager(data["email"], ip_address, "email_verification").is_verified():
-            errors["email"] = ["Email must be verified before registration"]
+            errors["email"] = [ResponseCode.EMAIL_VERIFICATION_REQUIRED]
 
         if errors:
             raise serializers.ValidationError(errors)
@@ -81,7 +84,7 @@ class CodeVerifySerializer(serializers.Serializer):
 
     def validate_code(self, code):
         if not code.isdigit():
-            raise serializers.ValidationError(["Code must contain only digits"])
+            raise serializers.ValidationError([ResponseCode.VALIDATION_CODE_INVALID_FORMAT])
         return code
 
 
@@ -95,16 +98,18 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         try:
             user = User.objects.get(email=data["email"])
         except User.DoesNotExist as e:
-            errors["email"] = ["User with this email does not exist"]
+            errors["email"] = [ResponseCode.USER_NOT_FOUND]
             raise serializers.ValidationError(errors) from e
 
         if data["password"] != data["password2"]:
-            errors["password"] = ["Passwords do not match"]
+            errors["password"] = [ResponseCode.PASSWORD_MISMATCH]
 
         try:
             validate_password(data["password"], user)
-        except DjangoValidationError as e:
-            errors["password"] = errors.get("password", []) + e.messages
+        except DjangoValidationError:
+            password_errors = errors.get("password", [])
+            password_errors.append(ResponseCode.PASSWORD_WEAK)
+            errors["password"] = password_errors
 
         if errors:
             raise serializers.ValidationError(errors)

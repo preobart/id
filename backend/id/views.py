@@ -11,6 +11,7 @@ from waffle import flag_is_active, get_waffle_flag_model
 
 from .errors import EmailSendError, EmailSendLimitExceededError
 from .managers import LoginLockoutManager, VerificationManager
+from .response_codes import ResponseCode
 from .serializers import (
     CodeSendSerializer,
     CodeVerifySerializer,
@@ -43,7 +44,7 @@ class RegisterView(APIView):
 
         VerificationManager(email, ip_address, "email_verification").clear()
         login(request, user)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(status=status.HTTP_201_CREATED)
 
 
 class LoginView(APIView):
@@ -63,19 +64,19 @@ class LoginView(APIView):
 
         if lockout_manager.is_locked():
             lockout_time = lockout_manager.get_lockout_time()
-            return Response({"detail": "login lockout", "time": lockout_time}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"code": ResponseCode.AUTH_LOGIN_LOCKOUT, "time": lockout_time}, status=status.HTTP_403_FORBIDDEN)
 
         user = authenticate(request, username=email, password=password)
 
         if user is None:
             if lockout_manager.record_failed():
                 lockout_time = lockout_manager.get_lockout_time()
-                return Response({"detail": "login lockout", "time": lockout_time}, status=status.HTTP_403_FORBIDDEN)
-            return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+                return Response({"code": ResponseCode.AUTH_LOGIN_LOCKOUT, "time": lockout_time}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"code": ResponseCode.AUTH_INVALID_CREDENTIALS}, status=status.HTTP_401_UNAUTHORIZED)
 
         lockout_manager.clear()
         login(request, user)
-        return Response({"user": UserSerializer(user).data}, status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_200_OK)
 
 
 class SendCodeView(APIView):
@@ -93,32 +94,21 @@ class SendCodeView(APIView):
         
         ip_address = get_client_ip(request)
 
-        if flag_is_active(request, "smartcaptcha_enabled") or flag_is_active(request, "email_verification_captcha"):
+        if flag_is_active(request, "smartcaptcha_enabled"):
             token = request.data.get("token")
             if not check_smartcaptcha(token, ip_address):
-                return Response(
-                    {"token": ["Invalid or missing captcha"]},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({"token": ResponseCode.CAPTCHA_INVALID}, status=status.HTTP_400_BAD_REQUEST)
+        
         verification = VerificationManager(email, ip_address, code_type)
 
         try:
             verification.send_code()
         except EmailSendLimitExceededError:
-            return Response(
-                {"detail": "Maximum number of code send attempts exceeded"},
-                status=status.HTTP_429_TOO_MANY_REQUESTS,
-            )
+            return Response({"code": ResponseCode.EMAIL_SEND_LIMIT_EXCEEDED}, status=status.HTTP_429_TOO_MANY_REQUESTS)
         except EmailSendError:
-            return Response(
-                {"detail": "Failed to send email"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+            return Response({"code": ResponseCode.EMAIL_SEND_FAILED}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        return Response(
-            {"detail": "Verification code has been sent to your email"},
-            status=status.HTTP_200_OK,
-        )
+        return Response(status=status.HTTP_200_OK)
 
 
 class VerifyCodeView(APIView):
@@ -138,16 +128,10 @@ class VerifyCodeView(APIView):
         verification = VerificationManager(email, ip_address, code_type)
 
         if not verification.verify_code(code):
-            return Response(
-                {"code": ["Invalid or expired verification code"]},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"code": ResponseCode.EMAIL_CODE_INVALID}, status=status.HTTP_400_BAD_REQUEST)
         
         verification.mark_verified()
-        return Response(
-            {"verified": True, "detail": "Email verified successfully"},
-            status=status.HTTP_200_OK,
-        )
+        return Response(status=status.HTTP_200_OK)
 
 
 class PasswordResetConfirmView(APIView):
@@ -164,21 +148,18 @@ class PasswordResetConfirmView(APIView):
         verification = VerificationManager(email, ip_address, "password_reset")
         
         if not verification.is_verified():
-            return Response(
-                {"email": ["Email must be verified before password reset"]},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return Response({"email": ResponseCode.EMAIL_VERIFICATION_REQUIRED}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer.save()
         verification.clear()
-        return Response({"detail": "Password has been reset successfully"}, status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_200_OK)
 
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def logout_view(request):
     logout(request)
-    return Response({"detail": "Logged out"})
+    return Response(status=status.HTTP_200_OK)
 
 
 @api_view(["GET"])
@@ -207,7 +188,7 @@ def userinfo_view(request):
 def check_email_view(request):
     email = request.query_params.get("email")
     if not email:
-        return Response({"email": ["Email is required"]}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"email": ResponseCode.VALIDATION_REQUIRED}, status=status.HTTP_400_BAD_REQUEST)
 
     exists = User.objects.filter(email=email).exists()
     return Response({"action": "login" if exists else "register"}, status=status.HTTP_200_OK)
