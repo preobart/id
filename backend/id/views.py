@@ -36,7 +36,7 @@ class RegisterView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data, context={"request": request})
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_400_BAD_REQUEST)
        
         user = serializer.save()
         email = serializer.validated_data["email"]
@@ -54,7 +54,7 @@ class LoginView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_400_BAD_REQUEST)
 
         email = serializer.validated_data["email"]
         password = serializer.validated_data["password"]
@@ -72,7 +72,7 @@ class LoginView(APIView):
             if lockout_manager.record_failed():
                 lockout_time = lockout_manager.get_lockout_time()
                 return Response({"code": ResponseCode.AUTH_LOGIN_LOCKOUT, "time": lockout_time}, status=status.HTTP_403_FORBIDDEN)
-            return Response({"code": ResponseCode.AUTH_INVALID_CREDENTIALS}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
 
         lockout_manager.clear()
         login(request, user)
@@ -87,7 +87,7 @@ class SendCodeView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_400_BAD_REQUEST)
 
         email = serializer.validated_data["email"]
         code_type = serializer.validated_data["code_type"]
@@ -104,9 +104,9 @@ class SendCodeView(APIView):
         try:
             verification.send_code()
         except EmailSendLimitExceededError:
-            return Response({"code": ResponseCode.EMAIL_SEND_LIMIT_EXCEEDED}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+            return Response(status=status.HTTP_429_TOO_MANY_REQUESTS)
         except EmailSendError:
-            return Response({"code": ResponseCode.EMAIL_SEND_FAILED}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response(status=status.HTTP_200_OK)
 
@@ -118,7 +118,7 @@ class VerifyCodeView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_400_BAD_REQUEST)
 
         email = serializer.validated_data["email"]
         code = serializer.validated_data["code"]
@@ -128,7 +128,7 @@ class VerifyCodeView(APIView):
         verification = VerificationManager(email, ip_address, code_type)
 
         if not verification.verify_code(code):
-            return Response({"code": ResponseCode.EMAIL_CODE_INVALID}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_400_BAD_REQUEST)
         
         verification.mark_verified()
         return Response(status=status.HTTP_200_OK)
@@ -141,14 +141,14 @@ class PasswordResetConfirmView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_400_BAD_REQUEST)
 
         email = serializer.validated_data["email"]
         ip_address = get_client_ip(request)
         verification = VerificationManager(email, ip_address, "password_reset")
         
         if not verification.is_verified():
-            return Response({"email": ResponseCode.EMAIL_VERIFICATION_REQUIRED}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_400_BAD_REQUEST)
 
         serializer.save()
         verification.clear()
@@ -188,7 +188,9 @@ def userinfo_view(request):
 def check_email_view(request):
     email = request.query_params.get("email")
     if not email:
-        return Response({"email": ResponseCode.VALIDATION_REQUIRED}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_400_BAD_REQUEST)
 
-    exists = User.objects.filter(email=email).exists()
-    return Response({"action": "login" if exists else "register"}, status=status.HTTP_200_OK)
+    exists = User.objects.filter(username=email).exists()
+    if exists:
+        return Response(status=status.HTTP_200_OK)
+    return Response(status=status.HTTP_404_NOT_FOUND)

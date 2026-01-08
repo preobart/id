@@ -6,7 +6,6 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from .managers import VerificationManager
-from .response_codes import ResponseCode
 from .utils.ip_utils import get_client_ip
 
 
@@ -16,13 +15,12 @@ User = get_user_model()
 class RegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     password2 = serializers.CharField(write_only=True)
-    first_name = serializers.CharField(required=True)
-    last_name = serializers.CharField(required=True)
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
     email = serializers.EmailField(
-        required=True,
         validators=[
             UniqueValidator(
-                queryset=User.objects.all(), message=[ResponseCode.EMAIL_ALREADY_EXISTS]
+                queryset=User.objects.all()
             )
         ],
     )
@@ -32,24 +30,19 @@ class RegistrationSerializer(serializers.ModelSerializer):
         fields = ("first_name", "last_name", "email", "password", "password2")
 
     def validate(self, data):
-        errors = {}
         if data["password"] != data["password2"]:
-            errors["password"] = [ResponseCode.PASSWORD_MISMATCH]
+            raise serializers.ValidationError({"password": "Passwords do not match"})
 
         try:
             validate_password(data["password"])
-        except DjangoValidationError:
-            password_errors = errors.get("password", [])
-            password_errors.append(ResponseCode.PASSWORD_WEAK)
-            errors["password"] = password_errors
+        except DjangoValidationError as e:
+            raise serializers.ValidationError({"password": e.messages}) from e
 
         request = self.context.get("request")
         ip_address = get_client_ip(request)
+        
         if not VerificationManager(data["email"], ip_address, "email_verification").is_verified():
-            errors["email"] = [ResponseCode.EMAIL_VERIFICATION_REQUIRED]
-
-        if errors:
-            raise serializers.ValidationError(errors)
+            raise serializers.ValidationError({"email": "Email verification required"})
 
         return data
 
@@ -61,58 +54,49 @@ class RegistrationSerializer(serializers.ModelSerializer):
 
 
 class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
-    password = serializers.CharField(required=True, write_only=True)
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
 
 
 class CodeSendSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
+    email = serializers.EmailField()
     code_type = serializers.ChoiceField(
-        choices=[("password_reset", "password_reset"), ("email_verification", "email_verification")],
-        required=True
+        choices=[("password_reset", "password_reset"), ("email_verification", "email_verification")]
     )
     token = serializers.CharField(required=False, write_only=True, allow_blank=True)
 
 
 class CodeVerifySerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
-    code = serializers.CharField(required=True, min_length=6, max_length=6)
+    email = serializers.EmailField()
+    code = serializers.CharField(max_length=6)
     code_type = serializers.ChoiceField(
-        choices=[("password_reset", "password_reset"), ("email_verification", "email_verification")],
-        required=True
+        choices=[("password_reset", "password_reset"), ("email_verification", "email_verification")]
     )
 
     def validate_code(self, code):
-        if not code.isdigit():
-            raise serializers.ValidationError([ResponseCode.VALIDATION_CODE_INVALID_FORMAT])
+        if len(code) != 6 or not code.isdigit():
+            raise serializers.ValidationError("Code must be 6 digits")
         return code
 
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
+    email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
     password2 = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        errors = {}
         try:
-            user = User.objects.get(email=data["email"])
+            user = User.objects.get(username=data["email"])
         except User.DoesNotExist as e:
-            errors["email"] = [ResponseCode.USER_NOT_FOUND]
-            raise serializers.ValidationError(errors) from e
+            raise serializers.ValidationError({"email": "User not found"}) from e
 
         if data["password"] != data["password2"]:
-            errors["password"] = [ResponseCode.PASSWORD_MISMATCH]
+            raise serializers.ValidationError({"password": "Passwords do not match"})
 
         try:
             validate_password(data["password"], user)
-        except DjangoValidationError:
-            password_errors = errors.get("password", [])
-            password_errors.append(ResponseCode.PASSWORD_WEAK)
-            errors["password"] = password_errors
-
-        if errors:
-            raise serializers.ValidationError(errors)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError({"password": e.messages}) from e
 
         data["user"] = user
         return data
