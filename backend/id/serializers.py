@@ -17,13 +17,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(write_only=True)
     first_name = serializers.CharField()
     last_name = serializers.CharField()
-    email = serializers.EmailField(
-        validators=[
-            UniqueValidator(
-                queryset=User.objects.all()
-            )
-        ],
-    )
+    email = serializers.EmailField(validators=[UniqueValidator(queryset=User.objects.all())])
 
     class Meta:
         model = User
@@ -106,6 +100,15 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         user.set_password(self.validated_data["password"])
         user.save()
         return user
+
+
+class CheckEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, email):
+        if not User.objects.filter(username=email).exists():
+            raise serializers.ValidationError("User not found")
+        return email
 
 
 class UserSerializer(serializers.ModelSerializer):

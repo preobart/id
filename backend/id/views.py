@@ -13,6 +13,7 @@ from .errors import EmailSendError, EmailSendLimitExceededError
 from .managers import LoginLockoutManager, VerificationManager
 from .response_codes import ResponseCode
 from .serializers import (
+    CheckEmailSerializer,
     CodeSendSerializer,
     CodeVerifySerializer,
     LoginSerializer,
@@ -157,6 +158,15 @@ class PasswordResetConfirmView(APIView):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+def check_email_view(request):
+    serializer = CheckEmailSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    return Response(status=status.HTTP_200_OK)
+    
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
 def logout_view(request):
     logout(request)
     return Response(status=status.HTTP_200_OK)
@@ -183,14 +193,3 @@ def userinfo_view(request):
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-@api_view(["GET"])
-@permission_classes([AllowAny])
-def check_email_view(request):
-    email = request.query_params.get("email")
-    if not email:
-        return Response(status=status.HTTP_400_BAD_REQUEST)
-
-    exists = User.objects.filter(username=email).exists()
-    if exists:
-        return Response(status=status.HTTP_200_OK)
-    return Response(status=status.HTTP_404_NOT_FOUND)
