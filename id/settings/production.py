@@ -1,0 +1,66 @@
+import re
+
+from .base import *
+
+
+DEBUG = False
+
+SECRET_KEY = env("SECRET_KEY")
+ALLOWED_HOSTS = env("ALLOWED_HOSTS", default="").split(",")
+
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    re.compile(r) for r in env("CORS_ALLOWED_ORIGIN_REGEXES", "").split(",") if r
+]
+CSRF_TRUSTED_ORIGINS = [
+    origin for origin in env("CSRF_TRUSTED_ORIGINS", "").split(",") if origin
+]
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_DOMAIN = None
+
+DATABASES["default"]["ATOMIC_REQUESTS"] = True
+
+STATIC_URL = "static/"
+STATIC_ROOT = base_dir_join("staticfiles")
+
+MEDIA_ROOT = base_dir_join("mediafiles")
+MEDIA_URL = "/media/"
+
+# Celery
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="")
+CELERY_RESULT_BACKEND = env("REDIS_URL")
+CELERY_SEND_TASK_ERROR_EMAILS = True
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": "logging.Formatter",
+            "fmt": "%(message)s",
+        },
+    },
+    "handlers": {
+        "console": {
+            "level": "INFO",
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+        },
+    },
+    "loggers": {
+        "json": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.server": {
+            "handlers": [],  # отключаем вывод
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
+
+import logging.config
+
+
+logging.config.dictConfig(LOGGING)
